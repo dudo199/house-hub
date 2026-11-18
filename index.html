@@ -180,15 +180,19 @@ textarea{resize:vertical}
 .tl-grid{position:absolute;top:0;bottom:0;border-left:1px solid color-mix(in srgb,var(--line) 55%,transparent);pointer-events:none}
 
 /* Plans */
-.plans{display:grid;grid-template-columns:220px minmax(0,1fr) 280px;gap:0;height:100%;min-height:520px}
+.plans{display:grid;grid-template-columns:240px minmax(0,1fr) 290px;gap:0;height:100%;min-height:560px}
 .plans aside{background:var(--panel);border-right:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:12px;overflow:auto}
 .plans aside.right{border-right:0;border-left:1px solid var(--line)}
 .tools{display:grid;grid-template-columns:1fr;gap:4px}
 .tools button{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:5px 8px;font-size:12.5px;text-align:left}
 .tools button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
 .glyph{width:20px;height:20px;border-radius:50%;border:2px solid var(--c);color:var(--c);display:inline-flex;align-items:center;justify-content:center;font:700 9px var(--mono);flex:none}
-.plan-stage{overflow:auto;padding:14px;display:flex;align-items:flex-start;justify-content:center;background:var(--paper)}
-.plan-stage svg{max-width:100%;height:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.plan-stage{position:relative;overflow:hidden;background:var(--paper);min-height:520px}
+.plan-stage svg{position:absolute;inset:10px;width:calc(100% - 20px);height:calc(100% - 20px);background:var(--panel);border:1px solid var(--line);border-radius:8px;touch-action:none}
+.plan-stage svg.panning{cursor:grabbing}
+.plan-tools{position:absolute;right:20px;top:20px;display:flex;flex-direction:column;gap:4px;z-index:2}
+.plan-tools button{width:34px;height:34px;border-radius:7px;border:1px solid var(--line);background:var(--panel);font-size:15px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.plan-tools .zl{font:500 10px var(--mono);text-align:center;color:var(--muted);background:var(--panel);border-radius:5px;padding:2px 0}
 .plan-stage svg.placing{cursor:crosshair}
 .pt-list{display:flex;flex-direction:column;gap:4px;font-size:12.5px}
 .pt-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer}
@@ -261,6 +265,12 @@ textarea{resize:vertical}
 .un-row{display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0}
 .btbl tr[data-circ]{cursor:pointer}
 .btbl tr[data-circ]:hover td{background:var(--paper)}
+/* DB layout */
+.dbl{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:10px}
+.dbl svg{display:block;touch-action:none}
+.dbl [data-dev]{cursor:grab}
+.dbl [data-dev].dragging{cursor:grabbing;opacity:.85}
+.devbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 /* Budget */
 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
@@ -375,10 +385,10 @@ const VARIANTS={
     {k:'ccu',l:'Cooker control unit 45 A + socket',g:'CCU',h:1100},{k:'cop',l:'Cooker outlet plate 45 A',g:'COP',h:600},{k:'dp20',l:'20 A double-pole switch with flex outlet',g:'20A',h:1100},
     {k:'dp45',l:'45 A double-pole switch (shower/cooker)',g:'45A',h:1800},{k:'shaver',l:'Shaver supply unit (BS EN 61558-2-5)',g:'SH',h:1500},{k:'wp',l:'Weatherproof socket IP66',g:'WP',h:600},
     {k:'ind16',l:'16 A industrial socket (BS EN 60309)',g:'16A',h:600},{k:'floor',l:'Floor socket box',g:'FL',h:0},{k:'rp5',l:'5 A round-pin socket (lamp circuit)',g:'5A',h:300}],
-  switch:[{k:'1g1w',l:'1-gang 1-way switch',g:'1G',h:1200},{k:'1g2w',l:'1-gang 2-way switch',g:'1G2',h:1200},{k:'2g',l:'2-gang 2-way switch',g:'2G',h:1200},{k:'3g',l:'3-gang 2-way switch',g:'3G',h:1200},
-    {k:'4g',l:'4-gang 2-way switch',g:'4G',h:1200},{k:'int',l:'Intermediate switch',g:'INT',h:1200},{k:'dim1',l:'1-gang dimmer',g:'D1',h:1200},{k:'dim2',l:'2-gang dimmer',g:'D2',h:1200},
-    {k:'pull',l:'Ceiling pull-cord switch',g:'PC',h:'c'},{k:'dp',l:'20 A double-pole switch',g:'DP',h:1200},{k:'fiso',l:'Fan isolator (3-pole)',g:'FI',h:1200},{k:'grid',l:'Grid switch plate',g:'GR',h:1200},
-    {k:'smart',l:'Smart / wireless switch',g:'SM',h:1200},{k:'pir',l:'PIR / occupancy sensor',g:'PIR',h:'c'},{k:'key',l:'Key switch',g:'KS',h:1200}],
+  switch:[{n:1,k:'1g1w',l:'1-gang 1-way switch',g:'1G',h:1200},{n:1,k:'1g2w',l:'1-gang 2-way switch',g:'1G2',h:1200},{n:2,k:'2g',l:'2-gang 2-way switch',g:'2G',h:1200},{n:3,k:'3g',l:'3-gang 2-way switch',g:'3G',h:1200},
+    {n:4,k:'4g',l:'4-gang 2-way switch',g:'4G',h:1200},{n:1,k:'int',l:'Intermediate switch',g:'INT',h:1200},{n:1,k:'dim1',l:'1-gang dimmer',g:'D1',h:1200},{n:2,k:'dim2',l:'2-gang dimmer',g:'D2',h:1200},
+    {n:1,k:'pull',l:'Ceiling pull-cord switch',g:'PC',h:'c'},{n:1,k:'dp',l:'20 A double-pole switch',g:'DP',h:1200},{n:1,k:'fiso',l:'Fan isolator (3-pole)',g:'FI',h:1200},{n:6,k:'grid',l:'Grid switch plate',g:'GR',h:1200},
+    {n:3,k:'smart',l:'Smart / wireless switch',g:'SM',h:1200},{n:1,k:'pir',l:'PIR / occupancy sensor',g:'PIR',h:'c'},{n:1,k:'key',l:'Key switch',g:'KS',h:1200}],
   data:[{k:'rj2',l:'Double data outlet RJ45 (Cat 6)',g:'D2',h:450},{k:'rj1',l:'Single data outlet RJ45',g:'D1',h:450},{k:'tv',l:'TV aerial (coax)',g:'TV',h:450},{k:'tvsat',l:'TV + satellite outlet',g:'TS',h:450},
     {k:'tel',l:'Telephone',g:'TEL',h:450},{k:'av',l:'HDMI / AV plate',g:'AV',h:450},{k:'ap',l:'Wi-Fi access point',g:'AP',h:'c'},{k:'bell',l:'Doorbell / intercom',g:'BEL',h:1400},{k:'cctv',l:'CCTV camera',g:'CAM',h:2400}],
   ac:[{k:'indoor',l:'Indoor unit supply',g:'AC',h:2200},{k:'iso',l:'Rotary isolator (outdoor unit)',g:'ISO',h:1500},{k:'spur',l:'Fused spur for indoor unit',g:'ACF',h:2000}],
@@ -390,6 +400,11 @@ const VARIANTS={
   alarm:[{k:'smoke',l:'Smoke alarm (mains, BS 5839-6)',g:'SA',h:'c'},{k:'heat',l:'Heat alarm (kitchen)',g:'HA',h:'c'},{k:'co',l:'Carbon monoxide alarm',g:'CO',h:1500}]
 };
 const varOf=p=>(VARIANTS[p.type]||[]).find(v=>v.k===p.variant);
+const gangsOf=p=>p&&p.type==='switch'?(varOf(p)?.n||1):0;
+const lightSw=p=>(Array.isArray(p.sw)?p.sw:[]).filter(x=>x&&S.points[x.id]);
+function lightsOf(swId){ return pointList().filter(p=>p.type==='light'&&lightSw(p).some(x=>x.id===swId)); }
+function syncLightsFor(swId){ const sw=S.points[swId]; const cid=sw?.circuitId||''; for(const l of lightsOf(swId)){ if(lightSw(l)[0]?.id!==swId) continue; if((l.circuitId||'')!==cid){ const n=clone(S.points[l.id]); n.circuitId=cid; savePoint(l.id,n); } } }
+function swName(p){ const r=S.rooms[p.roomId]; return `${ptGlyph(p)} ${p.label||ptLabel(p)} · ${r?r.name:''}`; }
 const ptGlyph=p=>varOf(p)?.g||PT[p.type]?.g||'?';
 const ptLabel=p=>varOf(p)?.l||PT[p.type]?.label||'Point';
 function ceilMm(room){ return Math.round(((S.meta.heights||[])[room?room.level:0]||2.7)*1000); }
@@ -397,6 +412,15 @@ function defaultHeight(v,room){ return v.h==='c'?ceilMm(room):v.h; }
 function heightLabel(p){ const r=S.rooms[p.roomId]; const h=+p.height; if(r&&h>=ceilMm(r)-50) return 'ceiling'; return h+' mm'; }
 const CIRC_COLORS=['#d1495b','#2e86ab','#e09f3e','#3a9d5d','#8e5ac8','#d45087','#00a6a6','#7a6c5d','#f26419','#4361ee','#9b2226','#2b9348','#b5179e','#606c38'];
 function circColor(c){ if(c&&c.color) return c.color; const list=Object.keys(S.circuits).sort(); const id=c&&(c.id||Object.keys(S.circuits).find(k=>S.circuits[k]===c)); const i=Math.max(0,list.indexOf(id)); return CIRC_COLORS[i%CIRC_COLORS.length]; }
+function lightSwitchEditor(p){
+  const sws=pointList().filter(x=>x.type==='switch').sort((a,b)=>(S.rooms[a.roomId]?.level??0)-(S.rooms[b.roomId]?.level??0)||roomName(a.roomId).localeCompare(roomName(b.roomId)));
+  const rows=lightSw(p); const cur=rows.length<3?[...rows,{id:'',gang:1}]:rows;
+  const cc=p.circuitId&&S.circuits[p.circuitId];
+  return `<div class="f" style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)">Switched by${sws.length?'':' <span>(place a switch on the plan first)</span>'}
+   ${cur.map((x,i)=>{ const sw=S.points[x.id]; const g=gangsOf(sw); return `<div style="display:flex;gap:6px"><select class="inp" data-swrow="${i}" data-swf="id" style="flex:1" aria-label="Switch ${i+1}"><option value="">${i===0?'Choose a switch…':i===rows.length?'+ add a 2-way switch…':'Remove'}</option>${sws.map(w=>`<option value="${w.id}" ${x.id===w.id?'selected':''}>${esc(swName(w))}</option>`).join('')}</select>
+     ${sw&&g>1?`<select class="inp" data-swrow="${i}" data-swf="gang" aria-label="Gang" style="width:86px">${Array.from({length:g},(_,k)=>`<option value="${k+1}" ${+x.gang===k+1?'selected':''}>gang ${k+1}</option>`).join('')}</select>`:''}</div>`; }).join('')}
+   <span>Circuit: ${cc?`<b style="color:${circColor(cc)}">${esc(cref(cc))} ${esc(cc.name||'')}</b> (from the switch)`:rows.length?'the switch is not on a circuit yet':'set by its switch'}</span></div>`;
+}
 function circuitFilterHTML(lv){
   const cs=circuitList().filter(c=>c.kind!=='submain'); const pts=elecPts().filter(p=>S.rooms[p.roomId]?.level===lv);
   const count=id=>pts.filter(p=>(id==='none'?!(p.circuitId&&S.circuits[p.circuitId]):p.circuitId===id)).length;
@@ -476,7 +500,7 @@ const store={db:null,mem:{rooms:{},tasks:{},points:{},items:{},boards:{},circuit
   },
   _q(path,fn){ const p=(this.queues[path]||Promise.resolve()).then(fn).catch(e=>{ console.error(e); toast(e&&e.code==='quota_exceeded'?'Storage is full: delete some items and try again.':'Could not save that change. Try again.'); }); this.queues[path]=p; return p; },
   put(col,id,data){
-    S[col==='meta'?'_meta':col];
+    undo.rec(col,id,col==='meta'?S.meta:S[col][id]);
     if(col!=='meta'){ S[col][id]=data; } else { S.meta={...S.meta,...data}; }
     scheduleRender();
     const path=col+'/'+id;
@@ -484,6 +508,7 @@ const store={db:null,mem:{rooms:{},tasks:{},points:{},items:{},boards:{},circuit
     this.mem[col][id]=data; (this.subs[col]||[]).forEach(cb=>cb({...this.mem[col]})); (this.subs[path]||[]).forEach(cb=>cb(data));
   },
   del(col,id){
+    undo.rec(col,id,S[col][id]);
     delete S[col][id]; scheduleRender();
     const path=col+'/'+id;
     if(this.db) return this._q(path,()=>this.db.doc(path).delete());
@@ -491,6 +516,14 @@ const store={db:null,mem:{rooms:{},tasks:{},points:{},items:{},boards:{},circuit
   }
 };
 function setBanner(t){const b=$('#banner'); b.textContent=t; b.dataset.slow=t.startsWith('Your saved data')?'1':'';}
+const undo={stack:[],batch:null,replay:false,
+  rec(col,id,prev){ if(this.replay) return; if(!this.batch){ this.batch=[]; this.stack.push(this.batch); if(this.stack.length>80) this.stack.shift(); clearTimeout(this._t); this._t=setTimeout(()=>{ this.batch=null; },450); }
+    if(!this.batch.some(x=>x.col===col&&x.id===id)) this.batch.push({col,id,prev:prev==null?null:clone(prev)}); },
+  run(){ this.batch=null; const b=this.stack.pop(); if(!b){ toast('Nothing to undo.'); return; } this.replay=true;
+    try{ for(const x of b.slice().reverse()){ if(x.col==='meta'){ if(x.prev) store.put('meta','house',x.prev); } else if(x.prev==null) store.del(x.col,x.id); else store.put(x.col,x.id,x.prev); } } finally{ this.replay=false; }
+    toast(`Undone (${this.stack.length} more step${this.stack.length===1?'':'s'} available).`); }
+};
+document.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){ const a=document.activeElement; if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable)) return; if(document.querySelector('.overlay')) return; e.preventDefault(); undo.run(); } });
 const saveTask=(id,t)=>store.put('tasks',id,t);
 const saveRoom=(id,r)=>store.put('rooms',id,r);
 const savePoint=(id,p)=>store.put('points',id,p);
@@ -767,15 +800,25 @@ function renderTimeline(){
 }
 
 /* ----- Plans ----- */
+function planViewBox(vb){ const z=UI.pz||{k:1}; if(z.lv!==UI.planLevel||!z.k||z.k<=1.001) { UI.pz={k:1,lv:UI.planLevel}; return vb; } const w=vb[2]/z.k, h=vb[3]/z.k; const cx=Math.max(vb[0]+w/2,Math.min(vb[0]+vb[2]-w/2,z.cx)), cy=Math.max(vb[1]+h/2,Math.min(vb[1]+vb[3]-h/2,z.cy)); z.cx=cx; z.cy=cy; return [cx-w/2,cy-h/2,w,h]; }
+function applyPlanZoom(){ const svg=$('#planSvg'); if(!svg) return; const vb=svg.dataset.vb.split(' ').map(Number); svg.setAttribute('viewBox',planViewBox(vb).join(' ')); const l=$('#pzLabel'); if(l) l.textContent=Math.round((UI.pz.k||1)*100)+'%'; }
+function zoomPlanAt(f,px,py){ const svg=$('#planSvg'); if(!svg) return; const vb=svg.dataset.vb.split(' ').map(Number); const z=UI.pz&&UI.pz.lv===UI.planLevel?UI.pz:{k:1,lv:UI.planLevel}; if(z.cx==null||z.k<=1.001){z.cx=vb[0]+vb[2]/2; z.cy=vb[1]+vb[3]/2;}
+  const k=Math.max(1,Math.min(12,z.k*f)); if(px!=null){ const r=k/z.k; z.cx=px-(px-z.cx)/r; z.cy=py-(py-z.cy)/r; } z.k=k; UI.pz=z; applyPlanZoom(); }
 function svgPoint(svg,e){ const pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
 function bindPlan(){
-  const svg=$('#planSvg'); if(!svg) return; let mv=null;
+  const svg=$('#planSvg'); if(!svg) return; let mv=null, pan=null; UI._panned=false;
+  svg.addEventListener('wheel',e=>{ e.preventDefault(); const p=svgPoint(svg,e); zoomPlanAt(Math.exp(-e.deltaY*.0015),p.x,p.y); },{passive:false});
+  svg.addEventListener('pointerdown',e=>{ if(e.target.closest('[data-pt]')&&UI.tool==='select') return; const z=UI.pz; if(!z||z.k<=1.001) return; if(UI.tool!=='select'&&!e.shiftKey&&e.button!==1) return;
+    pan={x:e.clientX,y:e.clientY,cx:z.cx,cy:z.cy,moved:false}; svg.setPointerCapture(e.pointerId); });
+  svg.addEventListener('pointermove',e=>{ if(!pan) return; const dx=e.clientX-pan.x, dy=e.clientY-pan.y; if(Math.abs(dx)+Math.abs(dy)>4){ pan.moved=true; svg.classList.add('panning'); }
+    if(!pan.moved) return; const ctm=svg.getScreenCTM(); UI.pz.cx=pan.cx-dx/ctm.a; UI.pz.cy=pan.cy-dy/ctm.d; applyPlanZoom(); });
+  svg.addEventListener('pointerup',()=>{ if(!pan) return; UI._panned=pan.moved; pan=null; svg.classList.remove('panning'); setTimeout(()=>UI._panned=false,0); });
   svg.addEventListener('pointerdown',e=>{ const g=e.target.closest('[data-pt]'); if(g&&UI.tool==='select'){ const s0=svgPoint(svg,e); const pt=S.points[g.dataset.pt]; mv={id:g.dataset.pt,moved:false,sx:s0.x,sy:s0.y,ox:pt.x,oy:pt.y}; svg.setPointerCapture(e.pointerId); e.preventDefault(); } });
   svg.addEventListener('pointermove',e=>{ if(!mv) return; const p=svgPoint(svg,e); const dx=p.x-mv.sx, dy=p.y-mv.sy; if(Math.abs(dx)+Math.abs(dy)<.04&&!mv.moved) return; mv.moved=true; mv.x=Math.round((mv.ox+dx)*20)/20; mv.y=Math.round((mv.oy+dy)*20)/20; const g=svg.querySelector(`[data-pt="${mv.id}"]`); if(g) g.setAttribute('transform',`translate(${mv.x-mv.ox} ${mv.y-mv.oy})`); });
   svg.addEventListener('pointerup',e=>{ if(!mv) return; const m=mv; mv=null;
     if(m.moved){ const room=roomAt(m.x,m.y,UI.planLevel); const p=clone(S.points[m.id]); if(room){p.x=m.x;p.y=m.y;p.roomId=room.id;} UI.planSel=m.id; savePoint(m.id,p); }
     else { UI.planSel=m.id; renderPlans(); } });
-  svg.addEventListener('click',e=>{ if(UI.tool==='select'){ if(!e.target.closest('[data-pt]')&&UI.planSel){UI.planSel=null;renderPlans();} return; }
+  svg.addEventListener('click',e=>{ if(UI._panned) return; if(UI.tool==='select'){ if(!e.target.closest('[data-pt]')&&UI.planSel){UI.planSel=null;renderPlans();} return; }
     const p=svgPoint(svg,e); const x=Math.round(p.x*20)/20, y=Math.round(p.y*20)/20; const room=roomAt(x,y,UI.planLevel);
     if(!room){ toast('Click inside a room to place the point.'); return; }
     if(UI.tool.startsWith('db:')){ const bid=UI.tool.slice(3); const b=clone(S.boards[bid]); if(b){ b.x=x; b.y=y; b.roomId=room.id; UI.tool='select'; store.put('boards',bid,b); toast(`${b.name} placed in ${room.name}.`); } return; }
@@ -1042,6 +1085,8 @@ function planG(lv,o={}){
     const list=pointList().filter(p=>{ const ty=PT[p.type], r=S.rooms[p.roomId]; if(!ty||!r||r.level!==lv||!o.pts.includes(ty.sector)) return false;
       if(o.filterCirc&&['electrical','lighting'].includes(ty.sector)){ const key=p.circuitId&&S.circuits[p.circuitId]?p.circuitId:'none'; if(UI.hiddenCircs[key]) return false; } return true; });
     const groups=[]; for(const p of list){ const gr=groups.find(x=>Math.hypot(x[0].x-p.x,x[0].y-p.y)<.15); if(gr) gr.push(p); else groups.push([p]); }
+    if(o.switching!==false){ const vis=new Set(list.map(p=>p.id)); for(const l of list.filter(p=>p.type==='light')) lightSw(l).forEach((x,i)=>{ const sw=S.points[x.id]; if(!sw||!vis.has(sw.id)) return; const cc=sw.circuitId&&S.circuits[sw.circuitId]; const col=cc?circColor(cc):'var(--muted)'; const mx=(sw.x+l.x)/2-(l.y-sw.y)*.18, my=(sw.y+l.y)/2+(l.x-sw.x)*.18;
+      g+=`<path d="M${sw.x} ${sw.y} Q${mx} ${my} ${l.x} ${l.y}" fill="none" stroke="${col}" stroke-width=".025" stroke-dasharray="${i?'.05 .05':'.14 .07'}" opacity=".85" pointer-events="none"/>`; if(gangsOf(sw)>1) g+=`<text x="${mx}" y="${my}" font-family="IBM Plex Mono, monospace" font-size=".12" fill="${col}" text-anchor="middle" pointer-events="none">g${x.gang||1}</text>`; }); }
     for(const grp of groups){ grp.sort((a,b)=>(+b.height||0)-(+a.height||0)); const n=grp.length;
       if(n>1) g+=`<circle cx="${grp[0].x}" cy="${grp[0].y}" r=".06" fill="var(--ink)" pointer-events="none"/>`;
       grp.forEach((p,i)=>{ const ty=PT[p.type]; const sel=o.ptsel===p.id; const cc=p.circuitId&&S.circuits[p.circuitId];
@@ -1092,14 +1137,17 @@ function renderPlans(){
        <button class="btn primary" type="button" id="expBtn" ${UI.exp.busy?'disabled':''}>${UI.exp.busy?'Building PDF…':'Download PDF (A3)'}</button>
        <span class="muted" style="font-size:11.5px">One A3 sheet per drawing and level, drawn to a standard scale with a title block and schedule.</span></div>
    </aside>
-   <div class="plan-stage"><svg id="planSvg" class="${UI.tool!=='select'?'placing':''}" viewBox="${vb.join(' ')}" width="${vb[2]*48}" height="${vb[3]*48}" role="img" aria-label="${LEVELS[lv]} plan">${svg}</svg></div>
+   <div class="plan-stage" id="planStage"><svg id="planSvg" class="${UI.tool!=='select'?'placing':''}" data-vb="${vb.join(' ')}" viewBox="${planViewBox(vb).join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${LEVELS[lv]} plan">${svg}</svg>
+     <div class="plan-tools"><button type="button" id="pzIn" title="Zoom in" aria-label="Zoom in">+</button><button type="button" id="pzOut" title="Zoom out" aria-label="Zoom out">−</button><button type="button" id="pzFit" title="Fit plan" aria-label="Fit plan">⤢</button><span class="zl" id="pzLabel">${Math.round((UI.pz?.k||1)*100)}%</span><button type="button" id="pzUndo" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">↶</button></div></div>
    <aside class="right">
      ${selP?`<div style="display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px"><div style="display:flex;gap:8px;align-items:center"><span class="glyph" style="--c:${SEC[PT[selP.type].sector].color}">${esc(ptGlyph(selP))}</span><b>${esc(ptLabel(selP))}</b><span class="muted">· ${esc(roomName(selP.roomId))}</span></div>
        ${(VARIANTS[selP.type]||[]).length?`<label class="f" for="ptVar">Type<select id="ptVar">${VARIANTS[selP.type].map(v=>`<option value="${v.k}" ${selP.variant===v.k?'selected':''}>${esc(v.l)}</option>`).join('')}</select></label>`:''}
        <label class="f" for="ptH">Height above finished floor (mm)<input id="ptH" type="number" min="0" step="10" value="${esc(selP.height??'')}" placeholder="e.g. 450"></label>
        <div style="display:flex;gap:4px;flex-wrap:wrap">${[150,300,450,1100,1200,1800,2100].map(h=>`<button type="button" class="btn small" data-ph="${h}">${h}</button>`).join('')}<button type="button" class="btn small" data-ph="ceil">Ceiling</button></div>
        <label class="f" for="ptLabel">Label<input id="ptLabel" value="${esc(selP.label||'')}" placeholder="e.g. Double socket by bed, 30 cm"></label>
-       ${['electrical','lighting'].includes(PT[selP.type].sector)?`<label class="f" for="ptCirc">Circuit<select id="ptCirc"><option value="">Not assigned</option>${circuitList().filter(c=>c.kind!=='submain').map(c=>`<option value="${c.id}" ${selP.circuitId===c.id?'selected':''}>${esc(cref(c))} ${esc(c.name||'')}</option>`).join('')}</select></label>${circuitList().length?'':'<span class="muted" style="font-size:12px">Add circuits on the Electrical page first.</span>'}`:''}
+       ${selP.type==='light'?lightSwitchEditor(selP):''}
+       ${selP.type==='switch'&&lightsOf(selP.id).length?`<div class="muted" style="font-size:12px">Controls ${lightsOf(selP.id).length} light point${lightsOf(selP.id).length===1?'':'s'}; they follow this switch's circuit.</div>`:''}
+       ${['electrical','lighting'].includes(PT[selP.type].sector)&&selP.type!=='light'?`<label class="f" for="ptCirc">Circuit<select id="ptCirc"><option value="">Not assigned</option>${circuitList().filter(c=>c.kind!=='submain').map(c=>`<option value="${c.id}" ${selP.circuitId===c.id?'selected':''}>${esc(cref(c))} ${esc(c.name||'')}</option>`).join('')}</select></label>${circuitList().length?'':'<span class="muted" style="font-size:12px">Add circuits on the Electrical page first.</span>'}`:''}
        <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="ptDone" ${selP.done?'checked':''}> Installed / done</label>
        <div style="display:flex;justify-content:space-between"><button class="btn small" type="button" id="ptClose">Close</button><button class="btn small danger" type="button" id="ptDel">Delete point</button></div></div>`:
        `<p class="muted" style="font-size:12.5px;margin:0">${UI.tool.startsWith('db:')?'Click inside a room to place '+esc(S.boards[UI.tool.slice(3)]?.name||'the board')+'.':UI.tool==='select'?'Pick a point type on the left, then click inside a room to place it. Click a point to edit it, or drag it to move it.':'Click inside a room to place a '+PT[UI.tool].label.toLowerCase()+'.'}</p>`}
@@ -1182,7 +1230,7 @@ function renderSetup(){
    </section>
    <section style="border-top:1px solid var(--line);padding-top:14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" type="button" id="suDone">${m.setupDone?'Done, back to house':'Finish setup'}</button>${m.setupDone?'<span class="okline">Setup complete. Changes save as you make them.</span>':'<span class="muted" style="font-size:12.5px">Changes save as you make them.</span>'}</div></section>
   </div>
-  <div class="preview"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>${LEVELS[lv]} · live preview</h2><span class="muted" style="font-size:12px">Dashed outline = house footprint · click a room to edit its doors and windows</span></div>
+  <div class="preview"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>${LEVELS[lv]} · live preview <button class="btn small" type="button" data-undo style="margin-left:6px">↶ Undo</button></h2><span class="muted" style="font-size:12px">Dashed outline = house footprint · click a room to edit its doors and windows</span></div>
    <svg id="setupSvg" viewBox="${vb.join(' ')}" role="img" aria-label="${LEVELS[lv]} preview" style="touch-action:none">${planG(lv,{fill:'plain',dims:true,click:'srm',sel:UI.setupSel})}${sel?`<rect data-sres="${sel.id}" x="${sel.x+sel.w-.18}" y="${sel.y+sel.d-.18}" width=".36" height=".36" rx=".06" fill="var(--accent)" stroke="var(--panel)" stroke-width=".04" style="cursor:nwse-resize"><title>Drag to resize</title></rect>`:''}</svg>
    <p class="muted" style="margin:0;font-size:12.5px">Drag a room to move it. Select it and drag the blue corner to resize it. Edges snap to neighbouring rooms and the footprint. Rename a room in the table on the left to change what it is.</p></div></section>`;
   bindSetupPlan();
@@ -1336,10 +1384,10 @@ function drawDBSheet(P,pg,F,FB,b,sheet,total,K){
   pg.drawRectangle({x:M-8,y:M-8,width:PW-2*M+16,height:PH-2*M+16,borderColor:ink,borderWidth:1});
   let y=PH-M-12; T(`${b.name} · DISTRIBUTION BOARD SCHEDULE`,M+4,y,{bold:true,size:14}); T(`${S.meta.name||'House'} · Sheet ${sheet} of ${total} · ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`,PW-M-4,y,{size:8,align:'right',color:grey}); y-=22;
   const r=S.rooms[b.roomId]; const feed=b.role==='sub'?circuitList().find(c=>c.kind==='submain'&&c.feeds===b.id):null;
-  const info=[['Role',b.role==='main'?'Main board (origin)':'Sub-board'],['Location',r?`${r.name}, ${LEVELS[r.level]}`:'not set'],['Ways',b.ways||'-'],[b.role==='main'?'Main switch':'Isolator',`${b.mainSwitch?b.mainSwitch+' A':'-'}${b.role==='main'?(b.poles==='DP'?' double-pole':b.poles==='SP'?' single-pole':''):''}`]];
+  const info=[['Role',b.role==='main'?'Main board (origin)':'Sub-board'],['Location',r?`${r.name}, ${LEVELS[r.level]}`:'not set'],['Modules',(()=>{const L=boardLayout(b); return `${L.used} of ${L.total} used (${L.rows} row${L.rows>1?'s':''})`;})()],[b.role==='main'?'Main switch':'Isolator',`${b.mainSwitch?b.mainSwitch+' A':'-'}${b.role==='main'?(b.poles==='DP'?' double-pole':b.poles==='SP'?' single-pole':''):''}`]];
   if(b.role==='main') info.push(['Supply',`230 V 1-ph, TT${b.supplyA?', '+b.supplyA+' A':''}`],['Over/under voltage',b.ovuv||'not recorded'],['Earth electrode RA',b.ra!==''&&b.ra!=null?b.ra+' ohm':'not measured']);
   else info.push(['Fed from',feed?`${cref(feed)}, ${feed.device} ${feed.curve}${feed.rating}, ${feed.cable} mm², ${feed.length||'?'} m`:'not set']);
-  info.push(['SPD',b.spd||'not recorded'],['Enclosure',b.enclosure||'not recorded']);
+  info.push(['SPD',b.spd||'not recorded'],['Enclosure',b.enclosure||'not recorded'],['Board devices',boardDevices(b).map(d=>`${DEVK[d.kind]?.short||d.kind}${d.rating?' '+d.rating+'A':''}${d.ma?' '+d.ma+'mA':''} (${d.mods}M)`).join(', ')||'-']);
   info.forEach((kv,i)=>{ const cx=M+4+(i%4)*270, cy=y-Math.floor(i/4)*13; T(kv[0],cx,cy,{size:7,color:grey}); T(String(kv[1]),cx+78,cy,{size:7.5}); }); y-=Math.ceil(info.length/4)*13+10;
   const cols=[['Way',30],['Circuit',170],['Type',110],['Device',52],['Rating',48],['kA',28],['RCD',62],['AFDD',34],['Live/cpc mm²',66],['Method',60],['Length',44],['Points',40],['V drop',44],['Checks',300]];
   let x=M+4; L(M,y+3,PW-M,y+3,.8); cols.forEach(([h,w])=>{ T(h,x,y-8,{bold:true,size:7}); x+=w; }); y-=13; L(M,y,PW-M,y,.5,ink); y-=11;
@@ -1430,6 +1478,10 @@ async function buildPDF(discs,lvls){
 
 /* ---------- Extra event handlers ---------- */
 function handleExtraClick(t,e){
+  if(t.closest('#pzIn')){ zoomPlanAt(1.4); return true; }
+  if(t.closest('#pzOut')){ zoomPlanAt(1/1.4); return true; }
+  if(t.closest('#pzFit')){ UI.pz={k:1,lv:UI.planLevel}; applyPlanZoom(); return true; }
+  if(t.closest('#pzUndo,[data-undo]')){ undo.run(); return true; }
   const ca=t.closest('[data-circall]'); if(ca){ const hide=ca.dataset.circall==='hide'; UI.hiddenCircs={}; if(hide){ Object.keys(S.circuits).forEach(k=>UI.hiddenCircs[k]=true); UI.hiddenCircs.none=true; } renderPlans(); return true; }
   const co=t.closest('[data-circonly]'); if(co){ e.preventDefault(); UI.hiddenCircs={none:true}; Object.keys(S.circuits).forEach(k=>{ if(k!==co.dataset.circonly) UI.hiddenCircs[k]=true; }); renderPlans(); return true; }
   const ph=t.closest('[data-ph]'); if(ph&&UI.planSel&&S.points[UI.planSel]){ const pt=clone(S.points[UI.planSel]); pt.height=ph.dataset.ph==='ceil'?ceilMm(S.rooms[pt.roomId]):Number(ph.dataset.ph); savePoint(UI.planSel,pt); return true; }
@@ -1534,11 +1586,12 @@ function elecChecks(){
     if(b.spd==='no') add('warn','UK','BS 7671 443.4 · 534',`${b.name}: no surge protective device (SPD). One is expected unless a risk assessment shows it is not needed; fit it at or near the origin.`,b.id);
     else if(!b.spd&&b.role==='main') add('info','UK','BS 7671 443.4',`${b.name}: record whether a surge protective device (SPD) is fitted.`,b.id);
     if(b.enclosure==='plastic') add('warn','UK','BS 7671 421.1.201',`${b.name}: a consumer unit in a dwelling should have a non-combustible (e.g. steel) enclosure.`,b.id);
-    const used=cs.length; if(+b.ways&&used>+b.ways) add('error','','',`${b.name}: ${used} circuits but only ${b.ways} ways. Use a bigger board.`,b.id); else if(+b.ways&&+b.ways-used<2) add('info','','',`${b.name}: ${+b.ways-used} spare way${+b.ways-used===1?'':'s'} left. Leave room for future circuits.`,b.id);
+    const LY=boardLayout(b); if(LY.overflow.length) add('error','','',`${b.name}: needs ${LY.used+LY.overflow.reduce((a,i)=>a+i.mods,0)} modules but has ${LY.total}. Use a bigger board or add a row.`,b.id); else if(LY.free<2) add('info','','',`${b.name}: ${LY.free} spare module${LY.free===1?'':'s'} left. Leave room for future circuits.`,b.id);
+    if(b.role==='main'&&Array.isArray(b.devices)&&!b.devices.some(d=>d.kind==='main')) add('warn','MT','Malta EIR · BS 7671 462.1.201',`${b.name}: no main switch shown in the board layout.`,b.id);
   }
   for(const c of circs){
     const ref=`${cref(c)} ${c.name||KIND[c.kind]?.label||''}`; const cp=pts.filter(p=>p.circuitId===c.id);
-    const rcd=c.device==='RCBO'||c.device==='RCD+MCB';
+    const rcd=c.device==='RCBO'||c.device==='RCD+MCB'||c.device==='WIFI-RCBO';
     if(c.kind!=='submain'){
       if(!rcd) add('error','MT','Malta EIR reg 20(5) · BS 7671 411.3.3 / 411.3.4 / 522.6.202',`${ref}: no 30 mA RCD. Malta requires 30 mA RCD protection on each sub-circuit; BS 7671 requires it for sockets up to 32 A, for lighting in dwellings and for cables concealed less than 50 mm deep in walls.`,c.boardId,c.id);
       else if(+c.rcdMa>30) add('error','MT','Malta EIR reg 20(5) · BS 7671 411.3.3',`${ref}: RCD is ${c.rcdMa} mA. It must be 30 mA (Malta allows up to 300 mA only for a specific high-leakage load).`,c.boardId,c.id);
@@ -1563,14 +1616,102 @@ function elecChecks(){
   }
   for(const p of pts){ const r=S.rooms[p.roomId]; if(p.type==='switch'&&isBathRoom(r)&&!['pull','pir','smart'].includes(p.variant)) add('warn','UK','BS 7671 701.512.3',`${ptLabel(p)} in ${r.name}: switches in a bath or shower room must be outside zones 0–2 (except SELV and pull-cords). A pull-cord or a switch outside the door is the usual answer.`,'',p.circuitId||'');
     if(p.type==='socket'&&isBathRoom(r)&&p.variant!=='shaver') add('error','UK','BS 7671 701.512.3',`${ptLabel(p)} in ${r.name}: sockets in a room with a bath or shower must be at least 2.5 m from the zone 1 boundary. Shaver supply units are allowed closer.`,'',p.circuitId||''); }
-  const un=pts.filter(p=>!p.circuitId||!S.circuits[p.circuitId]); if(un.length) add('info','','',`${un.length} electrical or lighting point${un.length===1?' is':'s are'} not assigned to a circuit yet.`);
+  const un=pts.filter(p=>p.type!=='light'&&(!p.circuitId||!S.circuits[p.circuitId])); if(un.length) add('info','','',`${un.length} socket, switch or other point${un.length===1?' is':'s are'} not on a circuit yet.`);
+  const ls=pts.filter(p=>p.type==='light'); const noSw=ls.filter(p=>!lightSw(p).length); if(noSw.length) add('info','','',`${noSw.length} light point${noSw.length===1?' has':'s have'} no switch yet. Assign each light to the switch (and gang) that controls it.`);
+  for(const l of ls){ const g=lightSw(l)[0]; if(g&&!S.points[g.id].circuitId) { add('info','','',`${ptLabel(l)} in ${roomName(l.roomId)}: its switch is not on a circuit yet.`); } }
   return out;
 }
+const DEVK={
+  main:{label:'Main switch / DP isolator',short:'MAIN',mods:2,fill:'#2b2f33'},
+  rcd:{label:'Main RCD (2-pole)',short:'RCD',mods:2,fill:'#3d5a80'},
+  ovr:{label:'Over/under voltage relay (OVR)',short:'OVR',mods:2,fill:'#6d597a'},
+  spd:{label:'Surge protection (SPD)',short:'SPD',mods:2,fill:'#9a6324'},
+  wifi:{label:'Wi-Fi smart breaker',short:'WiFi',mods:2,fill:'#0b7a75'},
+  meter:{label:'Energy meter / monitor',short:'kWh',mods:1,fill:'#5c677d'},
+  timer:{label:'Timer / contactor',short:'TMR',mods:1,fill:'#5c677d'},
+  blank:{label:'Blank cover',short:'',mods:1,fill:'#c9cdd0'}
+};
+const DEV_ORDER=['main','ovr','spd','rcd','wifi','meter','timer','blank'];
+function boardDevices(b){ if(Array.isArray(b.devices)) return b.devices; // virtual defaults until edited
+  const d=[]; if(b.role==='main'){ d.push({id:'v-main',kind:'main',mods:2,rating:b.mainSwitch||''}); if(b.ovuv!=='no') d.push({id:'v-ovr',kind:'ovr',mods:2}); if(b.spd!=='no') d.push({id:'v-spd',kind:'spd',mods:2}); } else d.push({id:'v-main',kind:'main',mods:2,rating:b.mainSwitch||''}); return d; }
+const circMods=c=>+c.mods||(['WIFI','WIFI-RCBO'].includes(c.device)?2:c.poles==='DP'?2:1);
+function boardGeom(b){ const perRow=+b.perRow||+b.ways||12, rows=+b.rows||1; return {perRow,rows,total:perRow*rows}; }
+function boardLayout(b){
+  const {perRow,rows,total}=boardGeom(b); const occ=new Array(total).fill(null); const out=[];
+  const items=[...boardDevices(b).map(d=>({key:'d:'+d.id,dev:d,mods:Math.max(1,+d.mods||DEVK[d.kind]?.mods||1),pos:d.pos})),
+    ...circuitList().filter(c=>c.boardId===b.id).map(c=>({key:'c:'+c.id,circ:c,mods:circMods(c),pos:c.pos}))];
+  const fits=(pos,m)=>pos>=0&&pos+m<=total&&Math.floor(pos/perRow)===Math.floor((pos+m-1)/perRow)&&occ.slice(pos,pos+m).every(x=>x===null);
+  const place=(it,pos)=>{ for(let i=0;i<it.mods;i++) occ[pos+i]=it.key; it.at=pos; out.push(it); };
+  const rest=[]; for(const it of items){ if(it.pos!=null&&it.pos!==''&&fits(+it.pos,it.mods)) place(it,+it.pos); else rest.push(it); }
+  for(const it of rest){ let p=-1; for(let i=0;i<total;i++){ if(fits(i,it.mods)){ p=i; break; } } if(p>=0) place(it,p); else { it.at=null; out.push(it); } }
+  const used=out.filter(i=>i.at!=null).reduce((a,i)=>a+i.mods,0);
+  return {items:out,perRow,rows,total,used,free:total-used,overflow:out.filter(i=>i.at==null)};
+}
+function dbLayoutSVG(b){
+  const L=boardLayout(b); const MW=40, RH=118, PAD=16, W=PAD*2+L.perRow*MW, H=PAD*2+L.rows*RH+(L.rows-1)*12;
+  let g=`<rect x="2" y="2" width="${W-4}" height="${H-4}" rx="10" fill="var(--panel)" stroke="var(--ink)" stroke-width="2"/>`;
+  for(let r=0;r<L.rows;r++){ const y=PAD+r*(RH+12); g+=`<rect x="${PAD-4}" y="${y+RH/2-7}" width="${L.perRow*MW+8}" height="14" fill="var(--line)"/>`;
+    for(let i=0;i<L.perRow;i++){ const x=PAD+i*MW; g+=`<rect x="${x+1}" y="${y}" width="${MW-2}" height="${RH}" rx="4" fill="none" stroke="var(--line)" stroke-dasharray="3 3"/><text x="${x+MW/2}" y="${y+RH+10}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="8" fill="var(--muted)">${r*L.perRow+i+1}</text>`; } }
+  for(const it of L.items){ if(it.at==null) continue; const r=Math.floor(it.at/L.perRow), col=it.at%L.perRow; const x=PAD+col*MW, y=PAD+r*(RH+12), w=it.mods*MW;
+    let fill,top,mid,bot,sub='';
+    if(it.dev){ const k=DEVK[it.dev.kind]||DEVK.blank; fill=k.fill; top=k.short; mid=it.dev.rating?it.dev.rating+(String(it.dev.rating).match(/[a-z]/i)?'':'A'):''; bot=it.dev.label||''; if(it.dev.kind==='rcd'&&it.dev.ma) sub=it.dev.ma+'mA'; }
+    else { const c=it.circ; fill=circColor(c); top=c.device==='WIFI'?'WiFi MCB':c.device==='WIFI-RCBO'?'WiFi RCBO':c.device||''; mid=`${c.curve||''}${c.rating||''}`; bot=`${c.way||''}`; sub=c.device==='MCB'||c.device==='WIFI'?(c.poles==='DP'?'DP':''):`${c.rcdMa||30}mA`; }
+    const dark=it.dev&&it.dev.kind==='blank'; const tc=dark?'var(--ink)':'#fff';
+    g+=`<g data-dev="${it.key}" data-mods="${it.mods}" data-at="${it.at}"><rect x="${x+2}" y="${y+4}" width="${w-4}" height="${RH-8}" rx="5" fill="${fill}" stroke="rgba(0,0,0,.35)"/>
+      <rect x="${x+w/2-7}" y="${y+RH/2-14}" width="14" height="28" rx="3" fill="rgba(255,255,255,.85)"/>
+      <text x="${x+w/2}" y="${y+18}" text-anchor="middle" font-family="IBM Plex Sans Condensed, sans-serif" font-weight="700" font-size="${w<50?(String(top).length>3?7.5:9):11}" fill="${tc}" pointer-events="none">${esc(w<50&&String(top).length>5?String(top).replace("WiFi ","W-"):top)}</text>
+      <text x="${x+w/2}" y="${y+32}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-weight="700" font-size="${w<50?10:12}" fill="${tc}" pointer-events="none">${esc(mid)}</text>
+      <text x="${x+w/2}" y="${y+RH-24}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="8.5" fill="${tc}" pointer-events="none">${esc(sub)}</text>
+      <text x="${x+w/2}" y="${y+RH-11}" text-anchor="middle" font-family="IBM Plex Sans Condensed, sans-serif" font-weight="700" font-size="${it.circ?12:8.5}" fill="${tc}" pointer-events="none">${esc(String(bot).slice(0,w<50?3:10))}</text>
+      <rect x="${x+w-14}" y="${y+6}" width="11" height="11" rx="2" fill="rgba(255,255,255,.9)"/><text x="${x+w-8.5}" y="${y+14.5}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="8" font-weight="700" fill="#222" pointer-events="none">${it.mods}</text>
+      <title>${esc(it.dev?(DEVK[it.dev.kind]?.label||'')+(it.dev.label?' · '+it.dev.label:''):cref(it.circ)+' '+(it.circ.name||''))} · ${it.mods} module${it.mods>1?'s':''} · drag to move</title></g>`; }
+  return {svg:`<svg id="dblSvg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" data-mw="${MW}" data-rh="${RH}" data-pad="${PAD}" data-per="${L.perRow}" data-rows="${L.rows}" role="img" aria-label="${esc(b.name)} layout">${g}</svg>`,L};
+}
+function bindDbLayout(b){
+  const svg=$('#dblSvg'); if(!svg) return; const MW=+svg.dataset.mw, RH=+svg.dataset.rh, PAD=+svg.dataset.pad, per=+svg.dataset.per, rows=+svg.dataset.rows; let dr=null;
+  const pt=e=>{ const q=svg.createSVGPoint(); q.x=e.clientX; q.y=e.clientY; return q.matrixTransform(svg.getScreenCTM().inverse()); };
+  svg.addEventListener('pointerdown',e=>{ const g=e.target.closest('[data-dev]'); if(!g) return; const p=pt(e); dr={g,key:g.dataset.dev,mods:+g.dataset.mods,at:+g.dataset.at,sx:p.x,sy:p.y,moved:false}; svg.setPointerCapture(e.pointerId); g.classList.add('dragging'); e.preventDefault(); });
+  svg.addEventListener('pointermove',e=>{ if(!dr) return; const p=pt(e); const dx=p.x-dr.sx, dy=p.y-dr.sy; if(Math.abs(dx)+Math.abs(dy)>3) dr.moved=true; dr.g.setAttribute('transform',`translate(${dx} ${dy})`);
+    const r0=Math.floor(dr.at/per), c0=dr.at%per; const col=Math.max(0,Math.min(per-dr.mods,Math.round(c0+dx/MW))); const row=Math.max(0,Math.min(rows-1,Math.round(r0+dy/(RH+12)))); dr.target=row*per+col; });
+  svg.addEventListener('pointerup',()=>{ if(!dr) return; const d=dr; dr=null; d.g.classList.remove('dragging');
+    if(!d.moved){ d.g.removeAttribute('transform'); const [k,id]=d.key.split(':'); if(k==='c') openCircuit(id); else openDevice(b.id,id); return; }
+    moveDevice(b.id,d.key,d.target); });
+}
+function moveDevice(bid,key,target){
+  const b=S.boards[bid]; const L=boardLayout({...b,id:bid}); const it=L.items.find(i=>i.key===key); if(!it||target==null){ renderElectrical(); return; }
+  const occ=new Array(L.total).fill(null); for(const x of L.items){ if(x.at==null||x.key===key) continue; for(let i=0;i<x.mods;i++) occ[x.at+i]=x.key; }
+  const rowOk=Math.floor(target/L.perRow)===Math.floor((target+it.mods-1)/L.perRow)&&target+it.mods<=L.total;
+  const hit=rowOk?[...new Set(occ.slice(target,target+it.mods).filter(Boolean))]:['x'];
+  const setPos=(k,pos)=>{ const [t,id]=k.split(':'); if(t==='c'){ const c=clone(S.circuits[id]); c.pos=pos; store.put('circuits',id,c); } else { const bb=clone(S.boards[bid]); bb.devices=boardDevices(bb).map(d=>({...d,id:String(d.id).replace(/^v-/,'d')})); const dev=bb.devices.find(d=>d.id===id.replace(/^v-/,'d')); if(dev) dev.pos=pos; store.put('boards',bid,bb); } };
+  const materialise=()=>{ if(!Array.isArray(b.devices)){ const bb=clone(S.boards[bid]); bb.devices=boardDevices(bb).map(d=>({...d,id:String(d.id).replace(/^v-/,'d')})); L.items.filter(x=>x.dev).forEach(x=>{ const d=bb.devices.find(q=>q.id===String(x.dev.id).replace(/^v-/,'d')); if(d) d.pos=x.at; }); store.put('boards',bid,bb); } };
+  const pinAll=()=>{ materialise(); L.items.filter(x=>x.circ&&x.at!=null&&(x.circ.pos==null||x.circ.pos==='')).forEach(x=>{ const c=clone(S.circuits[x.circ.id]); c.pos=x.at; store.put('circuits',x.circ.id,c); }); };
+  if(!hit.length){ pinAll(); setPos(key.replace(':v-',':d'),target); return; }
+  if(hit.length===1&&hit[0]!=='x'){ const other=L.items.find(i=>i.key===hit[0]); if(other&&other.mods===it.mods){ pinAll(); setPos(key.replace(':v-',':d'),other.at); setPos(other.key.replace(':v-',':d'),it.at); return; } }
+  toast('Not enough free space there. Drop it on an empty gap, or on a device of the same width to swap.'); renderElectrical();
+}
+function openDevice(bid,devId){
+  const b=S.boards[bid]; const list=boardDevices(b); const d=devId?list.find(x=>x.id===devId):null; const isNew=!d; const dev=d?{...d}:{kind:'rcd',mods:2,rating:'',label:'',ma:''};
+  const ov=document.createElement('div'); ov.className='overlay';
+  ov.innerHTML=`<form class="modal" style="width:min(460px,100%)"><h2>${isNew?'Add to '+esc(b.name):'Edit '+esc(DEVK[dev.kind]?.label||'device')}</h2>
+   <label class="f" for="dvKind">Device<select id="dvKind">${DEV_ORDER.map(k=>`<option value="${k}" ${dev.kind===k?'selected':''}>${esc(DEVK[k].label)}</option>`).join('')}</select></label>
+   <div class="grid3"><label class="f" for="dvMods">Width (modules)<input id="dvMods" type="number" min="1" max="8" value="${esc(dev.mods)}"></label><label class="f" for="dvRating">Rating<input id="dvRating" value="${esc(dev.rating||'')}" placeholder="e.g. 63, 40"></label><label class="f" for="dvMa">RCD mA<input id="dvMa" value="${esc(dev.ma||'')}" placeholder="30, 100, 300"></label></div>
+   <label class="f" for="dvLabel">Label / model<input id="dvLabel" value="${esc(dev.label||'')}" placeholder="e.g. Type 2 SPD, Sonoff Wi-Fi breaker"></label>
+   <p class="muted" style="font-size:12px;margin:0">Typical widths: double-pole main switch 2, 2-pole RCD 2, SPD 2 (1+N), over/under voltage relay 1–2, Wi-Fi smart breaker 1–2. Check the actual product.</p>
+   <div class="row-end">${isNew?'<span></span>':'<button class="btn danger" type="button" id="dvDel">Remove from board</button>'}<span style="display:flex;gap:8px"><button class="btn" type="button" id="dvCancel">Cancel</button><button class="btn primary" type="submit">Save</button></span></div></form>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#dvKind').addEventListener('change',e=>{ if(isNew) ov.querySelector('#dvMods').value=DEVK[e.target.value].mods; });
+  const close=()=>{ ov.remove(); render(); };
+  const commit=fn=>{ const bb=clone(S.boards[bid]); bb.devices=boardDevices(bb).map(x=>({...x,id:String(x.id).replace(/^v-/,'d')})); fn(bb); if(bb.devices.some(x=>x.kind==='spd')) bb.spd='yes'; else if(Array.isArray(bb.devices)) bb.spd=bb.spd==='yes'?'no':bb.spd; if(bb.role==='main'){ if(bb.devices.some(x=>x.kind==='ovr')) bb.ovuv='yes'; else bb.ovuv=bb.ovuv==='yes'?'no':bb.ovuv; } store.put('boards',bid,bb); };
+  ov.addEventListener('click',e=>{ if(e.target===ov||e.target.id==='dvCancel') close(); if(e.target.id==='dvDel'){ const rid=String(d.id).replace(/^v-/,'d'); commit(bb=>{ bb.devices=bb.devices.filter(x=>x.id!==rid); }); ov.remove(); } });
+  ov.querySelector('form').addEventListener('submit',e=>{ e.preventDefault(); const g=q=>ov.querySelector(q).value; const nd={kind:g('#dvKind'),mods:Math.max(1,Number(g('#dvMods'))||1),rating:g('#dvRating').trim(),label:g('#dvLabel').trim(),ma:g('#dvMa').trim()};
+    commit(bb=>{ if(isNew) bb.devices.push({...nd,id:uid('d')}); else { const rid=String(d.id).replace(/^v-/,'d'); const x=bb.devices.find(q=>q.id===rid); if(x) Object.assign(x,nd); } }); ov.remove(); });
+}
+function renumberWays(bid){ const L=boardLayout({...S.boards[bid],id:bid}); let n=1; L.items.filter(i=>i.circ&&i.at!=null).sort((a,b)=>a.at-b.at).forEach(i=>{ const c=clone(S.circuits[i.circ.id]); if(+c.way!==n){ c.way=n; store.put('circuits',i.circ.id,c); } n++; }); toast('Ways renumbered left to right.'); }
 const SEV={error:{label:'Must fix',c:'var(--bad)'},warn:{label:'Check',c:'var(--warn)'},info:{label:'Note',c:'var(--accent)'}};
 
 /* ----- Single-line diagram ----- */
 function sldSVG(b){
-  const cs=circuitList().filter(c=>c.boardId===b.id); const ways=Math.max(+b.ways||0,cs.length); const colW=78, x0=230, busY=150;
+  const cs=circuitList().filter(c=>c.boardId===b.id); const ways=cs.length+Math.max(0,Math.min(6,boardLayout(b).free)); const colW=78, x0=230, busY=150;
   const W=x0+Math.max(1,ways)*colW+30, H=520; const chk=elecChecks(); const bad=id=>chk.some(k=>k.cid===id&&k.level==='error');
   const T=(x,y,t,o='')=>`<text x="${x}" y="${y}" ${o} font-family="IBM Plex Sans Condensed, sans-serif" fill="var(--ink)">${esc(t)}</text>`;
   const box=(x,y,w,h,lines,stroke='var(--ink)')=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="5" fill="var(--panel)" stroke="${stroke}" stroke-width="1.4"/>`+lines.map((l,i)=>T(x+w/2,y+16+i*14,l,`text-anchor="middle" font-size="${i?10.5:12}" ${i?'':'font-weight="600"'}`)).join('');
@@ -1581,6 +1722,7 @@ function sldSVG(b){
     g+=`<line x1="105" y1="50" x2="105" y2="62" stroke="var(--ink)" stroke-width="1.6"/>`;
     g+=box(20,62,170,34,['Over/under voltage',b.ovuv==='yes'?'fitted':b.ovuv==='no'?'MISSING':'not recorded'],b.ovuv==='no'?'var(--bad)':'var(--ink)');
     g+=`<line x1="105" y1="96" x2="105" y2="106" stroke="var(--ink)" stroke-width="1.6"/>`;
+    const mrcd=boardDevices(b).find(d=>d.kind==='rcd'); if(mrcd){ g+=`<text x="105" y="${busY-4}" text-anchor="middle" font-family="IBM Plex Sans Condensed, sans-serif" font-size="10.5" fill="var(--muted)">then main RCD ${esc(mrcd.rating||'')}${mrcd.rating?'A':''} ${esc(mrcd.ma||'')}${mrcd.ma?'mA':''}</text>`; }
     g+=box(20,106,170,34,['Main switch',`${b.poles==='SP'?'single-pole':b.poles==='DP'?'double-pole':'poles ?'}${b.mainSwitch?' · '+b.mainSwitch+' A':''}`],b.poles==='SP'?'var(--bad)':'var(--ink)');
   } else {
     g+=box(20,62,170,48,['Fed from',feed?`${cref(feed)} · ${feed.device==='MCB'?'MCB':feed.device} ${feed.curve||''}${feed.rating||''}`:'no sub-main yet',feed?`${feed.cable||'?'} mm² · ${feed.length||'?'} m`:''],feed?'var(--ink)':'var(--warn)');
@@ -1600,7 +1742,7 @@ function sldSVG(b){
     const col=circColor(c); const stroke=bad(c.id)?'var(--bad)':'var(--ink)';
     g+=`<g data-circ="${c.id}" style="cursor:pointer"><line x1="${x}" y1="${busY}" x2="${x}" y2="${busY+28}" stroke="var(--ink)" stroke-width="1.4"/>`;
     g+=`<rect x="${x-30}" y="${busY+28}" width="60" height="50" rx="5" fill="var(--panel)" stroke="${stroke}" stroke-width="${bad(c.id)?2.2:1.4}"/>`;
-    g+=T(x,busY+43,c.device||'?','text-anchor="middle" font-size="10" fill="var(--muted)"')+T(x,busY+58,`${c.curve||''}${c.rating||'?'}`,'text-anchor="middle" font-size="14" font-weight="700"')+T(x,busY+72,c.device==='MCB'?(c.kA?c.kA+' kA':''):`${c.rcdMa||30}mA ${c.rcdType||''}`,'text-anchor="middle" font-size="9.5" fill="var(--muted)"');
+    g+=T(x,busY+43,c.device==='WIFI'?'WiFi MCB':c.device==='WIFI-RCBO'?'WiFi RCBO':(c.device||'?'),'text-anchor="middle" font-size="10" fill="var(--muted)"')+T(x,busY+58,`${c.curve||''}${c.rating||'?'}`,'text-anchor="middle" font-size="14" font-weight="700"')+T(x,busY+72,(c.device==='MCB'||c.device==='WIFI')?(c.kA?c.kA+' kA':''):`${c.rcdMa||30}mA ${c.rcdType||''}`,'text-anchor="middle" font-size="9.5" fill="var(--muted)"');
     g+=`<line x1="${x}" y1="${busY+78}" x2="${x}" y2="${busY+100}" stroke="${col}" stroke-width="2.4"/>`;
     g+=`<circle cx="${x}" cy="${busY+110}" r="11" fill="${col}"/>`+T(x,busY+114,String(c.way||i+1),'text-anchor="middle" font-size="11" font-weight="700" fill="#fff"');
     const n=elecPts().filter(p=>p.circuitId===c.id).length; const vd=circuitVd(c);
@@ -1617,7 +1759,7 @@ function renderElectrical(){
   const cnt=l=>chk.filter(k=>k.level===l).length;
   const filt=UI.chkFilter||'board'; const shown=chk.filter(k=>filt==='all'||!k.bid||k.bid===UI.board).sort((a,c)=>['error','warn','info'].indexOf(a.level)-['error','warn','info'].indexOf(c.level));
   const cs=b?circuitList().filter(c=>c.boardId===b.id):[];
-  const un=elecPts().filter(p=>!p.circuitId||!S.circuits[p.circuitId]);
+  const un=elecPts().filter(p=>p.type==='light'?!lightSw(p).length:(!p.circuitId||!S.circuits[p.circuitId]));
   const sel=(id,opts,val)=>`<select class="inp" id="${id}">${opts.map(([v,l])=>`<option value="${v}" ${String(val??'')===String(v)?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
   const yn=[['','Not recorded'],['yes','Yes'],['no','No']];
   $('#main').innerHTML=`<div class="page">
@@ -1630,7 +1772,8 @@ function renderElectrical(){
         <label class="f" for="bdName">Name<input id="bdName" value="${esc(b.name)}"></label>
         <label class="f" for="bdRole">Role${sel('bdRole',[['main','Main board (origin)'],['sub','Sub-board']],b.role)}</label>
         <label class="f" for="bdRoom">Location${sel('bdRoom',[['','Not set'],...roomList().map(r=>[r.id,`${r.name} (${LEVELS[r.level].split(' ')[0]})`])],b.roomId)}</label>
-        <label class="f" for="bdWays">Ways (modules for circuits)<input id="bdWays" type="number" min="1" value="${esc(b.ways??'')}"></label>
+        <label class="f" for="bdRows">DIN rail rows<input id="bdRows" type="number" min="1" max="6" value="${esc(b.rows||1)}"></label>
+        <label class="f" for="bdPer">Modules per row<input id="bdPer" type="number" min="2" max="36" value="${esc(b.perRow||b.ways||12)}"></label>
         <label class="f" for="bdMain">${b.role==='main'?'Main switch rating (A)':'Isolator rating (A)'}<input id="bdMain" type="number" min="0" value="${esc(b.mainSwitch??'')}"></label>
         ${b.role==='main'?`<label class="f" for="bdPoles">Main switch poles${sel('bdPoles',[['','Not recorded'],['DP','Double-pole'],['SP','Single-pole']],b.poles)}</label>
         <label class="f" for="bdOv">Over/under voltage device${sel('bdOv',yn,b.ovuv)}</label>
@@ -1639,23 +1782,30 @@ function renderElectrical(){
         <label class="f" for="bdSpd">Surge protection (SPD)${sel('bdSpd',yn,b.spd)}</label>
         <label class="f" for="bdEnc">Enclosure${sel('bdEnc',[['','Not recorded'],['metal','Metal (non-combustible)'],['plastic','Plastic']],b.enclosure)}</label>
        </div></section>
+     ${(()=>{ const D=dbLayoutSVG(b); return `<section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>Board layout</h2><span class="muted num" style="font-size:12.5px"><b style="color:${D.L.free<0||D.L.overflow.length?'var(--bad)':'var(--ink)'}">${D.L.used}</b> of ${D.L.total} modules used · ${D.L.free} free</span></div>
+       <div class="devbar"><button class="btn small" type="button" id="addDev">+ Add device</button><button class="btn small" type="button" data-adddev="rcd">+ Main RCD</button><button class="btn small" type="button" data-adddev="spd">+ SPD</button><button class="btn small" type="button" data-adddev="ovr">+ OVR</button><button class="btn small" type="button" data-adddev="wifi">+ Wi-Fi breaker</button><span style="flex:1"></span><button class="btn small" type="button" id="renumWays">Renumber ways left to right</button><button class="btn small" type="button" data-undo>↶ Undo</button></div>
+       <div class="dbl">${D.svg}</div>
+       ${D.L.overflow.length?`<div class="warn-list" style="color:var(--bad);padding:0">No room for: ${D.L.overflow.map(i=>esc(i.circ?cref(i.circ):DEVK[i.dev.kind]?.short)).join(', ')}. Add a row or more modules per row.</div>`:''}
+       <p class="muted" style="font-size:12px;margin:0">Drag a device to move it; drop it on a device of the same width to swap. Click to edit. The small number on each device is how many modules it takes.</p></section>`; })()}
      <section class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>Wiring diagram</h2><span class="muted" style="font-size:12px">Click a circuit to edit it. Red outline = must-fix issue.</span></div><div class="sld">${sldSVG(b)}</div></section>
      <section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>Circuit schedule</h2><span style="display:flex;gap:6px">${cs.length?'':'<button class="btn small" type="button" id="tplCirc">Add typical home circuits</button>'}<button class="btn small primary" type="button" id="addCirc">+ Add circuit</button></span></div>
        ${cs.length?`<div class="tbl-wrap"><table class="btbl"><thead><tr><th>Way</th><th>Circuit</th><th>Protection</th><th>RCD</th><th>Cable</th><th class="r">Length</th><th class="r">Points</th><th class="r">V drop</th><th>Checks</th></tr></thead><tbody>
        ${cs.map(c=>{ const n=elecPts().filter(p=>p.circuitId===c.id).length; const vd=circuitVd(c); const ck=chk.filter(k=>k.cid===c.id); const e=ck.filter(k=>k.level==='error').length, w=ck.filter(k=>k.level==='warn').length;
          return `<tr data-circ="${c.id}"><td class="mono" style="white-space:nowrap"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${circColor(c)};margin-right:5px;vertical-align:-1px"></i>${esc(c.way||'')}</td><td><b style="font-weight:500">${esc(c.name||KIND[c.kind]?.label)}</b><div class="muted" style="font-size:12px">${esc(KIND[c.kind]?.label||'')}${c.kind==='submain'?' → '+esc(S.boards[c.feeds]?.name||'?'):''}</div></td>
-         <td class="mono" style="white-space:nowrap">${esc(c.device||'')} ${esc(c.curve||'')}${esc(c.rating||'')}${c.kA?` · ${c.kA}kA`:''}</td><td class="mono" style="white-space:nowrap">${c.device==='MCB'?'—':`${c.rcdMa||30}mA ${c.rcdType||''}`}${c.afdd?' +AFDD':''}</td>
+         <td class="mono" style="white-space:nowrap">${esc(c.device||'')} ${esc(c.curve||'')}${esc(c.rating||'')}${c.kA?` · ${c.kA}kA`:''}</td><td class="mono" style="white-space:nowrap">${c.device==='MCB'||c.device==='WIFI'?'—':`${c.rcdMa||30}mA ${c.rcdType||''}`}${c.afdd?' +AFDD':''}</td>
          <td class="mono" style="white-space:nowrap">${esc(c.cable||'?')}/${esc(c.cpc||'?')} mm²<div class="muted" style="font-size:11px">${esc(METHODS[c.method]?.short||'')}</div></td><td class="r">${c.length?c.length+' m':'—'}</td><td class="r">${c.kind==='submain'?'—':n}</td><td class="r">${vd!=null?(vd/2.3).toFixed(1)+'%':'—'}</td>
          <td>${e?`<span class="pill" style="background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)">${e} fix</span> `:''}${w?`<span class="pill waiting">${w} check</span>`:''}${!e&&!w?'<span class="pill done">OK</span>':''}</td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">No circuits on this board yet.</div>'}
        <p class="muted" style="font-size:12px;margin:0">Cable ratings use BS 7671 Appendix 4 for 70 °C PVC copper at 30 °C; voltage drop is estimated at the full breaker rating (conservative), including the sub-main for sub-boards.</p></section>
-     ${un.length?`<section class="card"><h2>Points not on a circuit (${un.length})</h2><div class="un-list">${un.map(p=>{const ty=PT[p.type];return `<div class="un-row"><span class="glyph" style="--c:${SEC[ty.sector].color}">${esc(ptGlyph(p))}</span><span style="flex:1">${esc(p.label||ptLabel(p))} <span class="muted">· ${esc(roomName(p.roomId))}${p.height!=null&&p.height!==''?' · '+esc(heightLabel(p)):''}</span></span><select class="inp" data-assign="${p.id}" aria-label="Assign circuit"><option value="">Assign to…</option>${circuitList().filter(c=>c.kind!=='submain').map(c=>`<option value="${c.id}">${esc(cref(c))} ${esc(c.name||'')}</option>`).join('')}</select></div>`}).join('')}</div></section>`:''}
+     ${un.length?`<section class="card"><h2>Points still to connect (${un.length})</h2><p class="muted" style="font-size:12px;margin:0">Sockets and switches go on a circuit; light points go on a switch and take the switch's circuit.</p><div class="un-list">${un.map(p=>{const ty=PT[p.type];return `<div class="un-row"><span class="glyph" style="--c:${SEC[ty.sector].color}">${esc(ptGlyph(p))}</span><span style="flex:1">${esc(p.label||ptLabel(p))} <span class="muted">· ${esc(roomName(p.roomId))}${p.height!=null&&p.height!==''?' · '+esc(heightLabel(p)):''}</span></span>${p.type==='light'?`<select class="inp" data-assignsw="${p.id}" aria-label="Assign switch"><option value="">Switched by…</option>${pointList().filter(w=>w.type==='switch').map(w=>`<option value="${w.id}">${esc(swName(w))}</option>`).join('')}</select>`:`<select class="inp" data-assign="${p.id}" aria-label="Assign circuit"><option value="">Assign to…</option>${circuitList().filter(c=>c.kind!=='submain').map(c=>`<option value="${c.id}">${esc(cref(c))} ${esc(c.name||'')}</option>`).join('')}</select>`}</div>`}).join('')}</div></section>`:''}
    </div>
    <aside class="card checks"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Checks & notes</h2><div class="seg"><button type="button" data-chkf="board" aria-pressed="${filt==='board'}">This board</button><button type="button" data-chkf="all" aria-pressed="${filt==='all'}">All</button></div></div>
      <div class="std">Checked against <b>BS 7671 (IET Wiring Regulations, 18th Edition)</b> and Malta's <b>Electrical Installations Regulations</b>. Malta calls up the 18th Edition; the UK's current text is BS 7671:2018+A4:2026, so items only in the newer UK text are marked UK. <span class="tag mt">MT</span> = Malta requirement · <span class="tag uk">UK</span> = BS 7671.<br><b>This is a planning aid, not a design.</b> The installation must be designed, tested and certified by an electrician or engineer with the right Malta authorisation.</div>
      ${shown.map(k=>`<div class="chk ${k.level}"${k.cid?` data-circ="${k.cid}" style="cursor:pointer"`:''}><div class="chk-h"><span style="color:${SEV[k.level].c};font-weight:700">${SEV[k.level].label}</span>${k.src?`<span class="tag ${k.src==='MT'?'mt':'uk'}">${k.src}</span>`:''}${k.ref?`<span class="muted mono" style="font-size:10.5px">${esc(k.ref)}</span>`:''}</div><div>${esc(k.text)}</div></div>`).join('')||'<div class="empty">Nothing to flag on this board.</div>'}
    </aside></div>`:`<div class="empty" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px">No boards yet. Add your main distribution board and the sub-board, then their circuits.</div>`}
   </div>`;
+  afterElecRender();
 }
+function afterElecRender(){ const b=UI.board&&S.boards[UI.board]; if(b) bindDbLayout({...b,id:UI.board}); }
 function openCircuit(id,preset={}){
   const bid=preset.boardId||UI.board; const used=circuitList().filter(c=>c.boardId===bid).map(c=>+c.way);
   let way=1; while(used.includes(way)) way++;
@@ -1670,20 +1820,22 @@ function openCircuit(id,preset={}){
    <label class="f" for="ccColor">Colour<input id="ccColor" type="color" value="${esc(c.color||(id?circColor({...c,id}):CIRC_COLORS[Object.keys(S.circuits).length%CIRC_COLORS.length]))}" style="width:56px;height:34px;padding:2px"></label></div>
    <div id="ccFeedsWrap" ${c.kind==='submain'?'':'hidden'}><label class="f" for="ccFeeds">Feeds board<select id="ccFeeds"><option value="">Choose…</option>${opt(boardList().filter(x=>x.id!==c.boardId).map(x=>[x.id,x.name]),c.feeds)}</select></label></div>
    <h3 style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Breaker</h3>
-   <div class="grid3"><label class="f" for="ccDev">Device<select id="ccDev">${opt([['RCBO','RCBO (RCD + MCB in one)'],['MCB','MCB only'],['RCD+MCB','MCB under a shared RCD']],c.device)}</select></label>
+   <div class="grid3"><label class="f" for="ccDev">Device<select id="ccDev">${opt([['RCBO','RCBO (RCD + MCB in one)'],['MCB','MCB only'],['RCD+MCB','MCB under a shared RCD'],['WIFI-RCBO','Wi-Fi smart RCBO'],['WIFI','Wi-Fi smart MCB']],c.device)}</select></label>
    <label class="f" for="ccCurve">Curve<select id="ccCurve">${opt([['B','Type B'],['C','Type C'],['D','Type D']],c.curve)}</select></label>
    <label class="f" for="ccRating">Rating (A)<select id="ccRating">${opt(RATINGS.map(r=>[r,r+' A']),c.rating)}</select></label>
    <label class="f" for="ccKa">Breaking capacity (kA)<select id="ccKa">${opt([[3,'3 kA'],[4.5,'4.5 kA'],[6,'6 kA'],[10,'10 kA']],c.kA)}</select></label>
    <label class="f" for="ccMa">RCD sensitivity<select id="ccMa">${opt([[30,'30 mA'],[100,'100 mA'],[300,'300 mA']],c.rcdMa)}</select></label>
    <label class="f" for="ccRt">RCD type<select id="ccRt">${opt([['A','Type A'],['F','Type F'],['B','Type B'],['AC','Type AC']],c.rcdType)}</select></label></div>
-   <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="ccAfdd" ${c.afdd?'checked':''}> Arc fault detection (AFDD)</label>
+   <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center"><label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="ccAfdd" ${c.afdd?'checked':''}> Arc fault detection (AFDD)</label>
+   <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="ccDp" ${c.poles==='DP'?'checked':''}> Double-pole</label>
+   <label class="f" for="ccMods" style="flex-direction:row;align-items:center;gap:6px">Width in board<input id="ccMods" type="number" min="1" max="6" value="${esc(c.mods||'')}" placeholder="${circMods(c)}" style="width:64px"> modules</label></div>
    <h3 style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Cable</h3>
    <div class="grid3"><label class="f" for="ccCable">Live conductors (mm²)<select id="ccCable">${opt(SIZES.map(s=>[s,s+' mm²']),c.cable)}</select></label>
    <label class="f" for="ccCpc">Earth / cpc (mm²)<select id="ccCpc">${opt(SIZES.map(s=>[s,s+' mm²']),c.cpc)}</select></label>
    <label class="f" for="ccLen">Longest run (m)<input id="ccLen" type="number" min="0" step="0.5" value="${esc(c.length)}"></label></div>
    <label class="f" for="ccMethod">Installation method<select id="ccMethod">${opt(Object.entries(METHODS).map(([k,m])=>[k,m.label]),c.method)}</select></label>
    <div id="ccPtsWrap" ${c.kind==='submain'?'hidden':''}><h3 style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Points on this circuit</h3>
-   <div class="un-list" style="max-height:220px;overflow:auto">${pts.length?roomList().map(r=>{const l=pts.filter(p=>p.roomId===r.id);if(!l.length)return'';return `<div class="muted" style="font:600 11px var(--display);letter-spacing:.06em;text-transform:uppercase;margin-top:4px">${esc(r.name)} · ${LEVELS[r.level].split(' ')[0]}</div>`+l.map(p=>{const ty=PT[p.type];const other=p.circuitId&&p.circuitId!==id&&S.circuits[p.circuitId];return `<label class="un-row"><input type="checkbox" data-cpt="${p.id}" ${mine.has(p.id)?'checked':''}><span class="glyph" style="--c:${SEC[ty.sector].color}">${esc(ptGlyph(p))}</span><span>${esc(p.label||ptLabel(p))}${p.height!=null&&p.height!==''?` <span class="muted mono" style="font-size:11px">${esc(heightLabel(p))}</span>`:''}${other?` <span class="muted">(now on ${esc(cref({...S.circuits[p.circuitId]}))})</span>`:''}</span></label>`}).join('')}).join(''):'<div class="empty">Place sockets, switches and light points on the Plans page first.</div>'}</div></div>
+   <div class="un-list" style="max-height:220px;overflow:auto">${pts.length?roomList().map(r=>{const l=pts.filter(p=>p.roomId===r.id);if(!l.length)return'';return `<div class="muted" style="font:600 11px var(--display);letter-spacing:.06em;text-transform:uppercase;margin-top:4px">${esc(r.name)} · ${LEVELS[r.level].split(' ')[0]}</div>`+l.map(p=>{const ty=PT[p.type];const other=p.circuitId&&p.circuitId!==id&&S.circuits[p.circuitId]; const vs=p.type==='light'&&lightSw(p)[0]; return `<label class="un-row"${vs?' style="opacity:.6"':''}><input type="checkbox" data-cpt="${p.id}" ${mine.has(p.id)?'checked':''} ${vs?'disabled title="Follows its switch"':''}><span class="glyph" style="--c:${SEC[ty.sector].color}">${esc(ptGlyph(p))}</span><span>${esc(p.label||ptLabel(p))}${p.height!=null&&p.height!==''?` <span class="muted mono" style="font-size:11px">${esc(heightLabel(p))}</span>`:''}${vs?` <span class="muted">(via switch ${esc(ptGlyph(S.points[vs.id]))})</span>`:other?` <span class="muted">(now on ${esc(cref({...S.circuits[p.circuitId]}))})</span>`:''}</span></label>`}).join('')}).join(''):'<div class="empty">Place sockets, switches and light points on the Plans page first.</div>'}</div></div>
    <label class="f" for="ccNotes">Notes<textarea id="ccNotes" rows="2">${esc(c.notes||'')}</textarea></label>
    <div class="row-end">${id?'<button class="btn danger" type="button" id="ccDel">Delete circuit</button>':'<span></span>'}<span style="display:flex;gap:8px"><button class="btn" type="button" id="ccCancel">Cancel</button><button class="btn primary" type="submit">Save</button></span></div></form>`;
   document.body.appendChild(ov); ov.querySelector('#ccName').focus();
@@ -1693,9 +1845,10 @@ function openCircuit(id,preset={}){
   ov.addEventListener('click',e=>{ const t=e.target; if(t===ov||t.id==='ccCancel') close(); if(t.id==='ccDel'){ if(t.dataset.sure){ store.del('circuits',id); pointList().filter(p=>p.circuitId===id).forEach(p=>{const n=clone(S.points[p.id]); n.circuitId=''; savePoint(p.id,n);}); close(); } else { t.dataset.sure='1'; t.textContent='Click again to delete'; } } });
   ov.addEventListener('keydown',e=>{ if(e.key==='Escape') close(); });
   ov.querySelector('form').addEventListener('submit',e=>{ e.preventDefault(); const g=s=>ov.querySelector(s).value;
-    const n={...c,color:g('#ccColor'),boardId:g('#ccBoard'),way:Number(g('#ccWay'))||way,kind:g('#ccKind'),name:g('#ccName').trim(),feeds:g('#ccKind')==='submain'?g('#ccFeeds'):'',device:g('#ccDev'),curve:g('#ccCurve'),rating:Number(g('#ccRating')),kA:Number(g('#ccKa')),rcdMa:Number(g('#ccMa')),rcdType:g('#ccRt'),afdd:ov.querySelector('#ccAfdd').checked,cable:Number(g('#ccCable')),cpc:Number(g('#ccCpc')),method:g('#ccMethod'),length:g('#ccLen')===''?'':Number(g('#ccLen')),notes:g('#ccNotes')};
+    const n={...c,color:g('#ccColor'),boardId:g('#ccBoard'),way:Number(g('#ccWay'))||way,kind:g('#ccKind'),name:g('#ccName').trim(),feeds:g('#ccKind')==='submain'?g('#ccFeeds'):'',device:g('#ccDev'),curve:g('#ccCurve'),rating:Number(g('#ccRating')),kA:Number(g('#ccKa')),rcdMa:Number(g('#ccMa')),rcdType:g('#ccRt'),afdd:ov.querySelector('#ccAfdd').checked,poles:ov.querySelector('#ccDp').checked?'DP':'',mods:g('#ccMods')===''?'':Number(g('#ccMods')),cable:Number(g('#ccCable')),cpc:Number(g('#ccCpc')),method:g('#ccMethod'),length:g('#ccLen')===''?'':Number(g('#ccLen')),notes:g('#ccNotes')};
     if(!n.name) n.name=KIND[n.kind]?.label||'Circuit';
-    const cid=id||uid('c'); ov.querySelectorAll('[data-cpt]').forEach(cb=>{ const p=S.points[cb.dataset.cpt]; if(!p) return; const on=cb.checked; if(on&&p.circuitId!==cid){ savePoint(cb.dataset.cpt,{...clone(p),circuitId:cid}); } else if(!on&&p.circuitId===cid){ savePoint(cb.dataset.cpt,{...clone(p),circuitId:''}); } });
+    const cid=id||uid('c'); const touched=[]; ov.querySelectorAll('[data-cpt]:not([disabled])').forEach(cb=>{ const p=S.points[cb.dataset.cpt]; if(!p) return; const on=cb.checked; if(on&&p.circuitId!==cid){ savePoint(cb.dataset.cpt,{...clone(p),circuitId:cid}); touched.push(cb.dataset.cpt); } else if(!on&&p.circuitId===cid){ savePoint(cb.dataset.cpt,{...clone(p),circuitId:''}); touched.push(cb.dataset.cpt); } });
+    touched.forEach(pid=>{ if(S.points[pid]?.type==='switch') syncLightsFor(pid); });
     ov.remove(); store.put('circuits',cid,n); });
 }
 function addTypicalCircuits(bid){
@@ -1707,20 +1860,27 @@ function addTypicalCircuits(bid){
 }
 function handleElecClick(t){
   const bd=t.closest('[data-board]'); if(bd){ UI.board=bd.dataset.board; UI.confirmDel=null; renderElectrical(); return true; }
-  if(t.closest('#addBoard')){ const n=boardList().length; const id=uid('b'); UI.board=id; store.put('boards',id,{name:'DB'+(n+1),role:n?'sub':'main',roomId:'',ways:12,mainSwitch:'',poles:'',ovuv:'',spd:'',enclosure:'',ra:'',supplyA:''}); return true; }
+  if(t.closest('#addBoard')){ const n=boardList().length; const id=uid('b'); UI.board=id; store.put('boards',id,{name:'DB'+(n+1),role:n?'sub':'main',roomId:'',rows:1,perRow:12,mainSwitch:'',poles:'',ovuv:'',spd:'',enclosure:'',ra:'',supplyA:''}); return true; }
   if(t.closest('#delBoard')){ const id=UI.board; if(UI.confirmDel===id){ circuitList().filter(c=>c.boardId===id).forEach(c=>{ store.del('circuits',c.id); pointList().filter(p=>p.circuitId===c.id).forEach(p=>{const n=clone(S.points[p.id]); n.circuitId=''; savePoint(p.id,n);}); }); store.del('boards',id); UI.board=null; UI.confirmDel=null; } else { UI.confirmDel=id; renderElectrical(); } return true; }
   if(t.closest('#placeBoard')){ const b=S.boards[UI.board]; const r=S.rooms[b.roomId]; UI.planLevel=r?r.level:0; UI.tool='db:'+UI.board; UI.planLayers.electrical=true; go('plans'); toast(`Click on the plan where ${b.name} goes.`); return true; }
   if(t.closest('#addCirc')){ openCircuit(null); return true; }
+  if(t.closest('#addDev')){ openDevice(UI.board,null); return true; }
+  const ad=t.closest('[data-adddev]'); if(ad){ const bb=clone(S.boards[UI.board]); const k=ad.dataset.adddev; bb.devices=boardDevices(bb).map(x=>({...x,id:String(x.id).replace(/^v-/,'d')})); bb.devices.push({id:uid('d'),kind:k,mods:DEVK[k].mods,rating:k==='rcd'?'40':'',ma:k==='rcd'?'30':'',label:''}); if(k==='spd') bb.spd='yes'; if(k==='ovr') bb.ovuv='yes'; store.put('boards',UI.board,bb); toast(DEVK[k].label+' added. Drag it into place.'); return true; }
+  if(t.closest('#renumWays')){ renumberWays(UI.board); return true; }
   if(t.closest('#tplCirc')){ addTypicalCircuits(UI.board); return true; }
   const cf=t.closest('[data-chkf]'); if(cf){ UI.chkFilter=cf.dataset.chkf; renderElectrical(); return true; }
   const ci=t.closest('[data-circ]'); if(ci&&S.circuits[ci.dataset.circ]){ openCircuit(ci.dataset.circ); return true; }
   return false;
 }
 function handleElecChange(t){
-  const map={bdName:'name',bdRole:'role',bdRoom:'roomId',bdWays:'ways',bdMain:'mainSwitch',bdPoles:'poles',bdOv:'ovuv',bdRa:'ra',bdSupply:'supplyA',bdSpd:'spd',bdEnc:'enclosure'};
-  if(map[t.id]&&UI.board){ const b=clone(S.boards[UI.board]); let v=t.value; if(['ways','mainSwitch','ra','supplyA'].includes(map[t.id])) v=v===''?'':Number(v); if(map[t.id]==='name') v=v.trim()||'DB'; b[map[t.id]]=v; store.put('boards',UI.board,b); return true; }
-  if(t.dataset.assign){ if(!t.value) return true; const p=clone(S.points[t.dataset.assign]); p.circuitId=t.value; savePoint(t.dataset.assign,p); return true; }
-  if(t.id==='ptCirc'){ const p=clone(S.points[UI.planSel]); p.circuitId=t.value; savePoint(UI.planSel,p); return true; }
+  const map={bdName:'name',bdRole:'role',bdRoom:'roomId',bdRows:'rows',bdPer:'perRow',bdMain:'mainSwitch',bdPoles:'poles',bdOv:'ovuv',bdRa:'ra',bdSupply:'supplyA',bdSpd:'spd',bdEnc:'enclosure'};
+  if(map[t.id]&&UI.board){ const b=clone(S.boards[UI.board]); let v=t.value; if(['rows','perRow','mainSwitch','ra','supplyA'].includes(map[t.id])) v=v===''?'':Number(v); if(map[t.id]==='name') v=v.trim()||'DB'; b[map[t.id]]=v; store.put('boards',UI.board,b); return true; }
+  if(t.dataset.assign){ if(!t.value) return true; const p=clone(S.points[t.dataset.assign]); p.circuitId=t.value; savePoint(t.dataset.assign,p); if(p.type==='switch') syncLightsFor(t.dataset.assign); return true; }
+  if(t.dataset.assignsw){ if(!t.value) return true; const p=clone(S.points[t.dataset.assignsw]); p.sw=[{id:t.value,gang:1}]; p.circuitId=S.points[t.value]?.circuitId||''; savePoint(t.dataset.assignsw,p); return true; }
+  if(t.id==='ptCirc'){ const p=clone(S.points[UI.planSel]); p.circuitId=t.value; savePoint(UI.planSel,p); if(p.type==='switch') syncLightsFor(UI.planSel); return true; }
+  if(t.dataset.swrow!=null&&UI.planSel){ const p=clone(S.points[UI.planSel]); const i=Number(t.dataset.swrow); p.sw=lightSw(p).map(x=>({...x})); const f=t.dataset.swf;
+    if(f==='id'){ if(!t.value){ p.sw.splice(i,1); } else { p.sw[i]={id:t.value,gang:1}; } } else if(p.sw[i]) p.sw[i].gang=Number(t.value);
+    p.circuitId=p.sw[0]?(S.points[p.sw[0].id]?.circuitId||''):p.circuitId; savePoint(UI.planSel,p); return true; }
   return false;
 }
 
