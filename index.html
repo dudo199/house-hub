@@ -806,7 +806,9 @@ function renderTimeline(){
 
 /* ----- Plans ----- */
 function planViewBox(vb){ const z=UI.pz||{k:1}; if(z.lv!==UI.planLevel||!z.k||z.k<=1.001) { UI.pz={k:1,lv:UI.planLevel}; return vb; } const w=vb[2]/z.k, h=vb[3]/z.k; const cx=Math.max(vb[0]+w/2,Math.min(vb[0]+vb[2]-w/2,z.cx)), cy=Math.max(vb[1]+h/2,Math.min(vb[1]+vb[3]-h/2,z.cy)); z.cx=cx; z.cy=cy; return [cx-w/2,cy-h/2,w,h]; }
-function applyPlanZoom(){ const svg=$('#planSvg'); if(!svg) return; const vb=svg.dataset.vb.split(' ').map(Number); svg.setAttribute('viewBox',planViewBox(vb).join(' ')); const l=$('#pzLabel'); if(l) l.textContent=Math.round((UI.pz.k||1)*100)+'%'; }
+function planPtScale(){ const z=UI.pz; return z&&z.lv===UI.planLevel&&z.k>1?1/z.k:1; }
+function applyPlanZoom(){ const svg=$('#planSvg'); if(!svg) return; const vb=svg.dataset.vb.split(' ').map(Number); svg.setAttribute('viewBox',planViewBox(vb).join(' '));
+  const s=planPtScale(); svg.querySelectorAll('.ptc').forEach(el=>{ const x=+el.dataset.ax, y=+el.dataset.ay; if(s===1) el.removeAttribute('transform'); else el.setAttribute('transform',`translate(${x} ${y}) scale(${s}) translate(${-x} ${-y})`); }); const l=$('#pzLabel'); if(l) l.textContent=Math.round((UI.pz.k||1)*100)+'%'; }
 function zoomPlanAt(f,px,py){ const svg=$('#planSvg'); if(!svg) return; const vb=svg.dataset.vb.split(' ').map(Number); const z=UI.pz&&UI.pz.lv===UI.planLevel?UI.pz:{k:1,lv:UI.planLevel}; if(z.cx==null||z.k<=1.001){z.cx=vb[0]+vb[2]/2; z.cy=vb[1]+vb[3]/2;}
   const k=Math.max(1,Math.min(12,z.k*f)); if(px!=null){ const r=k/z.k; z.cx=px-(px-z.cx)/r; z.cy=py-(py-z.cy)/r; } z.k=k; UI.pz=z; applyPlanZoom(); }
 function svgPoint(svg,e){ const pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
@@ -819,7 +821,7 @@ function bindPlan(){
     if(!pan.moved) return; const ctm=svg.getScreenCTM(); UI.pz.cx=pan.cx-dx/ctm.a; UI.pz.cy=pan.cy-dy/ctm.d; applyPlanZoom(); });
   svg.addEventListener('pointerup',()=>{ if(!pan) return; UI._panned=pan.moved; pan=null; svg.classList.remove('panning'); setTimeout(()=>UI._panned=false,0); });
   svg.addEventListener('pointerdown',e=>{ const g=e.target.closest('[data-pt]'); if(g&&UI.tool==='select'){ const s0=svgPoint(svg,e); const pt=S.points[g.dataset.pt]; mv={id:g.dataset.pt,moved:false,sx:s0.x,sy:s0.y,ox:pt.x,oy:pt.y}; svg.setPointerCapture(e.pointerId); e.preventDefault(); } });
-  svg.addEventListener('pointermove',e=>{ if(!mv) return; const p=svgPoint(svg,e); const dx=p.x-mv.sx, dy=p.y-mv.sy; if(Math.abs(dx)+Math.abs(dy)<.04&&!mv.moved) return; mv.moved=true; mv.x=Math.round((mv.ox+dx)*20)/20; mv.y=Math.round((mv.oy+dy)*20)/20; const g=svg.querySelector(`[data-pt="${mv.id}"]`); if(g) g.setAttribute('transform',`translate(${mv.x-mv.ox} ${mv.y-mv.oy})`); });
+  svg.addEventListener('pointermove',e=>{ if(!mv) return; const p=svgPoint(svg,e); const dx=p.x-mv.sx, dy=p.y-mv.sy; if(Math.abs(dx)+Math.abs(dy)<.04&&!mv.moved) return; mv.moved=true; mv.x=Math.round((mv.ox+dx)*20)/20; mv.y=Math.round((mv.oy+dy)*20)/20; const g=svg.querySelector(`[data-pt="${mv.id}"]`); const s=planPtScale(); if(g) g.setAttribute('transform',`translate(${(mv.x-mv.ox)/s} ${(mv.y-mv.oy)/s})`); });
   svg.addEventListener('pointerup',e=>{ if(!mv) return; const m=mv; mv=null;
     if(m.moved){ const room=roomAt(m.x,m.y,UI.planLevel); const p=clone(S.points[m.id]); if(room){p.x=m.x;p.y=m.y;p.roomId=room.id;} UI.planSel=m.id; savePoint(m.id,p); }
     else { UI.planSel=m.id; renderPlans(); } });
@@ -1091,7 +1093,8 @@ function planG(lv,o={}){
     const groups=[]; for(const p of list){ const gr=groups.find(x=>Math.hypot(x[0].x-p.x,x[0].y-p.y)<.15); if(gr) gr.push(p); else groups.push([p]); }
     if(o.switching!==false){ const vis=new Set(list.map(p=>p.id)); for(const l of list.filter(p=>p.type==='light')) lightSw(l).forEach((x,i)=>{ const sw=S.points[x.id]; if(!sw||!vis.has(sw.id)) return; const cc=sw.circuitId&&S.circuits[sw.circuitId]; const col=cc?circColor(cc):'var(--muted)'; const mx=(sw.x+l.x)/2-(l.y-sw.y)*.18, my=(sw.y+l.y)/2+(l.x-sw.x)*.18;
       g+=`<path d="M${sw.x} ${sw.y} Q${mx} ${my} ${l.x} ${l.y}" fill="none" stroke="${col}" stroke-width=".025" stroke-dasharray="${i?'.05 .05':'.14 .07'}" opacity=".85" pointer-events="none"/>`; if(gangsOf(sw)>1) g+=`<text x="${mx}" y="${my}" font-family="JetBrains Mono, monospace" font-size=".12" fill="${col}" text-anchor="middle" pointer-events="none">g${x.gang||1}</text>`; }); }
-    for(const grp of groups){ grp.sort((a,b)=>(+b.height||0)-(+a.height||0)); const n=grp.length;
+    const PS=o.ptScale||1; const sc=(x,y)=>PS===1?'':` transform="translate(${x} ${y}) scale(${PS}) translate(${-x} ${-y})"`;
+    for(const grp of groups){ grp.sort((a,b)=>(+b.height||0)-(+a.height||0)); const n=grp.length; g+=`<g class="ptc" data-ax="${grp[0].x}" data-ay="${grp[0].y}"${sc(grp[0].x,grp[0].y)}>`;
       if(n>1) g+=`<circle cx="${grp[0].x}" cy="${grp[0].y}" r=".06" fill="var(--ink)" pointer-events="none"/>`;
       grp.forEach((p,i)=>{ const ty=PT[p.type]; const sel=o.ptsel===p.id; const cc=p.circuitId&&S.circuits[p.circuitId];
         const c=(o.byCirc!==false&&cc&&['electrical','lighting'].includes(ty.sector))?circColor(cc):SEC[ty.sector].color;
@@ -1100,9 +1103,9 @@ function planG(lv,o={}){
         g+=`<g data-pt="${p.id}" style="cursor:pointer"><circle cx="${px}" cy="${py}" r="${sel?.26:.2}" fill="${p.done?c:'var(--panel)'}" stroke="${sel?'var(--accent)':c}" stroke-width="${sel?.07:.05}"/><text x="${px}" y="${py+.004}" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${fs}" fill="${p.done?'#fff':c}" pointer-events="none">${esc(gl)}</text>`;
         if(cc&&o.circ!==false) g+=`<text x="${px+.25}" y="${py-.12}" font-family="JetBrains Mono, monospace" font-size=".14" font-weight="600" fill="${circColor(cc)}" pointer-events="none">${esc(cref(cc))}</text>`;
         if(o.heights!==false&&p.height!=null&&p.height!=='') g+=`<text x="${px+.25}" y="${py+.17}" font-family="JetBrains Mono, monospace" font-size=".13" fill="var(--muted)" pointer-events="none">${esc(heightLabel(p))}</text>`;
-        g+=`<title>${esc(ptLabel(p))}${p.height!=null&&p.height!==''?' · '+heightLabel(p):''}${cc?' · '+cref(cc):''}${p.done?' (done)':''}</title></g>`; }); } }
+        g+=`<title>${esc(ptLabel(p))}${p.height!=null&&p.height!==''?' · '+heightLabel(p):''}${cc?' · '+cref(cc):''}${p.done?' (done)':''}</title></g>`; }); g+='</g>'; } }
   if(o.pts&&o.pts.includes('electrical')){ for(const b of boardList()){ const r=S.rooms[b.roomId]; if(b.x==null||!r||r.level!==lv) continue;
-    g+=`<g pointer-events="none"><rect x="${b.x-.32}" y="${b.y-.16}" width=".64" height=".32" rx=".04" fill="var(--ink)"/><text x="${b.x}" y="${b.y+.005}" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size=".16" fill="var(--panel)">${esc(b.name)}</text></g>`; } }
+    g+=`<g class="ptc" data-ax="${b.x}" data-ay="${b.y}"${(o.ptScale||1)===1?'':` transform="translate(${b.x} ${b.y}) scale(${o.ptScale}) translate(${-b.x} ${-b.y})"`} pointer-events="none"><rect x="${b.x-.32}" y="${b.y-.16}" width=".64" height=".32" rx=".04" fill="var(--ink)"/><text x="${b.x}" y="${b.y+.005}" text-anchor="middle" dominant-baseline="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size=".16" fill="var(--panel)">${esc(b.name)}</text></g>`; } }
   return g;
 }
 function build2D(){
@@ -1121,7 +1124,7 @@ function renderPlans(){
   const vb=[b.x0-pad,b.y0-pad,(b.x1-b.x0)+pad*2,(b.y1-b.y0)+pad*2];
   const pts=pointList().filter(p=>{const r=S.rooms[p.roomId]; return r&&r.level===lv&&PT[p.type];});
   const sec=[...(UI.planLayers.electrical?['electrical','lighting']:[]),...(UI.planLayers.plumbing?['plumbing']:[])];
-  const svg=planG(lv,{fill:'plain',walls:UI.planLayers.walls,pts:sec,dims:true,ptsel:UI.planSel,filterCirc:true,byCirc:UI.planByCirc!==false,heights:UI.planHeights!==false});
+  const svg=planG(lv,{fill:'plain',walls:UI.planLayers.walls,pts:sec,dims:true,ptsel:UI.planSel,filterCirc:true,byCirc:UI.planByCirc!==false,heights:UI.planHeights!==false,ptScale:planPtScale()});
   const selP=UI.planSel&&S.points[UI.planSel]?{id:UI.planSel,...S.points[UI.planSel]}:null;
   const counts=s=>{const l=pts.filter(p=>s.includes(PT[p.type].sector));return `${l.filter(p=>p.done).length}/${l.length}`};
   const H3=t=>`<h3 style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">${t}</h3>`;
