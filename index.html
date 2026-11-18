@@ -244,6 +244,23 @@ textarea{resize:vertical}
 .okline{font-size:12.5px;color:var(--good)}
 .csv{font:12px/1.4 var(--mono);width:100%;min-height:110px;border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:8px}
 
+/* Electrical */
+.elec-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:14px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.card h2{font-size:16px}
+.egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.sld{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
+.checks{position:sticky;top:0;max-height:calc(100vh - 150px);overflow:auto}
+.std{font-size:12px;color:var(--muted);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 10px;line-height:1.5}
+.chk{border-left:4px solid var(--c);padding:6px 10px;font-size:12.5px;background:var(--paper);border-radius:0 6px 6px 0;display:flex;flex-direction:column;gap:3px}
+.chk.error{--c:var(--bad)} .chk.warn{--c:var(--warn)} .chk.info{--c:var(--accent)}
+.chk-h{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11.5px}
+.tag{font:700 9.5px var(--mono);padding:1px 5px;border-radius:3px;letter-spacing:.04em}
+.tag.mt{background:#c8102e;color:#fff} .tag.uk{background:var(--ink);color:var(--panel)}
+.un-list{display:flex;flex-direction:column;gap:4px}
+.un-row{display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0}
+.btbl tr[data-circ]{cursor:pointer}
+.btbl tr[data-circ]:hover td{background:var(--paper)}
 /* Budget */
 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
@@ -271,6 +288,8 @@ textarea{resize:vertical}
 .export label{display:flex;gap:8px;align-items:center;font-size:13px}
 
 @media (max-width:980px){
+  .elec-grid{grid-template-columns:1fr}
+  .checks{position:static;max-height:none}
   .setup{grid-template-columns:1fr;height:auto}
   .setup .form{border-right:0;border-bottom:1px solid var(--line)}
   .tiles{grid-template-columns:repeat(2,1fr)}
@@ -301,6 +320,7 @@ textarea{resize:vertical}
     <button data-view="tasks">Tasks</button>
     <button data-view="timeline">Timeline</button>
     <button data-view="plans">Plans</button>
+    <button data-view="electrical">Electrical</button>
     <button data-view="dump">Brain dump</button>
     <button data-view="budget">Budget</button>
     <button data-view="setup">Setup</button>
@@ -358,12 +378,12 @@ const eur=n=>n==null||isNaN(n)?'—':new Intl.NumberFormat('en-MT',{style:'curre
 const SCALE=34; // px per metre in the 3D model
 
 /* ---------- State ---------- */
-const S={rooms:{},tasks:{},points:{},items:{},meta:{name:'The Townhouse',target:'',daysPerWeek:3,width:0,depth:0,heights:[2.9,2.9,2.4],setupDone:false},loaded:{rooms:false,tasks:false,points:false}};
+const S={rooms:{},tasks:{},points:{},items:{},boards:{},circuits:{},meta:{name:'The Townhouse',target:'',daysPerWeek:3,width:0,depth:0,heights:[2.9,2.9,2.4],setupDone:false},loaded:{rooms:false,tasks:false,points:false}};
 const UI={view:'house',level:'all',layer:'progress',full:false,spin:-32,tilt:52,zoom:null,room:null,roomTab:'tasks',editRoom:null,
   tf:{sectors:[],room:'',q:''},planLevel:0,tool:'select',planSel:null,planLayers:{walls:true,electrical:true,plumbing:true},
   dump:{text:'',rows:null,busy:false,summary:''},tl:{proposal:null,busy:false,note:''},advice:{text:'',busy:false},showAllDone:false,
   dim:'3d',setupLevel:0,setupSel:null,csv:{text:'',prune:false,msg:''},bf:{cat:'',q:'',room:''},
-  exp:{disc:{arch:true,elec:true,plumb:true,walls:false},levels:[true,true,true],busy:false}};
+  exp:{disc:{arch:true,elec:true,db:true,plumb:true,walls:false},levels:[true,true,true],busy:false}};
 let CAP={sample:null,dictation:null,assets:null,downloads:null};
 const itemList=()=>Object.entries(S.items).map(([id,t])=>({id,...t}));
 
@@ -387,7 +407,7 @@ const roomName=id=>S.rooms[id]?.name||'';
 const isOver=t=>t.status!=='done'&&t.due&&t.due<todayISO();
 
 /* ---------- Store (db when available, memory otherwise) ---------- */
-const store={db:null,mem:{rooms:{},tasks:{},points:{},items:{},meta:{}},subs:{},queues:{},
+const store={db:null,mem:{rooms:{},tasks:{},points:{},items:{},boards:{},circuits:{},meta:{}},subs:{},queues:{},
   async init(){
     let use=null;
     for(let i=0;i<20&&!use;i++){ if(window.claude&&typeof window.claude.use==='function') use=window.claude.use; else await new Promise(r=>setTimeout(r,100)); }
@@ -458,7 +478,7 @@ function render(){
   renderTop();
   if(isTyping()){ deferred=true; return; }
   const v=UI.view;
-  if(v==='house') renderHouse(); else if(v==='tasks') renderTasks(); else if(v==='timeline') renderTimeline(); else if(v==='plans') renderPlans(); else if(v==='budget') renderBudget(); else if(v==='setup') renderSetup(); else renderDump();
+  if(v==='house') renderHouse(); else if(v==='tasks') renderTasks(); else if(v==='timeline') renderTimeline(); else if(v==='plans') renderPlans(); else if(v==='budget') renderBudget(); else if(v==='electrical') renderElectrical(); else if(v==='setup') renderSetup(); else renderDump();
 }
 function renderTop(){
   $('#houseName').textContent=S.meta.name||'My house';
@@ -717,6 +737,7 @@ function bindPlan(){
   svg.addEventListener('click',e=>{ if(UI.tool==='select'){ if(!e.target.closest('[data-pt]')&&UI.planSel){UI.planSel=null;renderPlans();} return; }
     const p=svgPoint(svg,e); const x=Math.round(p.x*20)/20, y=Math.round(p.y*20)/20; const room=roomAt(x,y,UI.planLevel);
     if(!room){ toast('Click inside a room to place the point.'); return; }
+    if(UI.tool.startsWith('db:')){ const bid=UI.tool.slice(3); const b=clone(S.boards[bid]); if(b){ b.x=x; b.y=y; b.roomId=room.id; UI.tool='select'; store.put('boards',bid,b); toast(`${b.name} placed in ${room.name}.`); } return; }
     const id=uid('p'); UI.planSel=id; savePoint(id,{type:UI.tool,roomId:room.id,x,y,label:'',done:false,created:Date.now()}); });
 }
 function roomAt(x,y,lv){ return roomList().find(r=>r.level===lv&&x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.d); }
@@ -857,6 +878,7 @@ document.addEventListener('click',e=>{
   const t=e.target;
   const v=t.closest('#tabs button'); if(v){ go(v.dataset.view); return; }
   const gv=t.closest('[data-goview]'); if(gv){ go(gv.dataset.goview); return; }
+  if(UI.view==='electrical'&&handleElecClick(t)) return;
   if(handleExtraClick(t,e)) return;
   if(t.closest('#newTaskBtn')){ openTask(null,{roomId:UI.view==='house'&&UI.room?UI.room:''}); return; }
   const ot=t.closest('[data-open-task]'); if(ot){ openTask(ot.dataset.openTask); return; }
@@ -902,6 +924,7 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',e=>{
   const t=e.target;
+  if(handleElecChange(t)) return;
   if(handleExtraChange(t)) return;
   if(t.dataset.done){ toggleDone(t.dataset.done,t.checked); return; }
   if(t.dataset.ptdone){ const p=clone(S.points[t.dataset.ptdone]); p.done=t.checked; savePoint(t.dataset.ptdone,p); return; }
@@ -974,7 +997,10 @@ function planG(lv,o={}){
      <line x1="${b.x0-.7}" y1="${b.y0}" x2="${b.x0-.7}" y2="${b.y1}"/><line x1="${b.x0-.85}" y1="${b.y0}" x2="${b.x0-.55}" y2="${b.y0}"/><line x1="${b.x0-.85}" y1="${b.y1}" x2="${b.x0-.55}" y2="${b.y1}"/>
      <text x="${b.x0-.82}" y="${b.y0+D/2}" text-anchor="middle" stroke="none" transform="rotate(-90 ${b.x0-.82} ${b.y0+D/2})">${D.toFixed(2)} m</text></g>`; }
   if(o.pts&&o.pts.length){ for(const p of pointList()){ const ty=PT[p.type]; const r=S.rooms[p.roomId]; if(!ty||!r||r.level!==lv||!o.pts.includes(ty.sector)) continue; const c=SEC[ty.sector].color; const sel=o.ptsel===p.id;
+    const cc=p.circuitId&&S.circuits[p.circuitId]; if(cc&&o.circ!==false) g+=`<text x="${p.x+.26}" y="${p.y-.2}" font-family="IBM Plex Mono, monospace" font-size=".15" font-weight="600" fill="var(--muted)" pointer-events="none">${esc(cref(cc))}</text>`;
     g+=`<g data-pt="${p.id}" style="cursor:pointer"><circle cx="${p.x}" cy="${p.y}" r="${sel?.26:.2}" fill="${p.done?c:'var(--panel)'}" stroke="${sel?'var(--accent)':c}" stroke-width="${sel?.07:.05}"/><text x="${p.x}" y="${p.y+.004}" text-anchor="middle" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-weight="700" font-size="${ty.g.length>1?.13:.17}" fill="${p.done?'#fff':c}" pointer-events="none">${ty.g}</text><title>${esc(p.label||ty.label)}${p.done?' (done)':''}</title></g>`; } }
+  if(o.pts&&o.pts.includes('electrical')){ for(const b of boardList()){ const r=S.rooms[b.roomId]; if(b.x==null||!r||r.level!==lv) continue;
+    g+=`<g pointer-events="none"><rect x="${b.x-.32}" y="${b.y-.16}" width=".64" height=".32" rx=".04" fill="var(--ink)"/><text x="${b.x}" y="${b.y+.005}" text-anchor="middle" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-weight="700" font-size=".16" fill="var(--panel)">${esc(b.name)}</text></g>`; } }
   return g;
 }
 function build2D(){
@@ -1004,7 +1030,7 @@ function renderPlans(){
      <div>${H3('Place a point')}<div class="tools"><button type="button" data-tool="select" aria-pressed="${UI.tool==='select'}"><span class="glyph" style="--c:var(--muted)">↖</span>Select / move</button>
      ${PTYPES.map(p=>`<button type="button" data-tool="${p.key}" aria-pressed="${UI.tool===p.key}"><span class="glyph" style="--c:${SEC[p.sector].color}">${p.g}</span>${p.label}</button>`).join('')}</div></div>
      <div class="export">${H3('Export PDF drawings')}
-       ${[['arch','Architectural'],['elec','Electrical & lighting'],['plumb','Plumbing & gas'],['walls','Wall works']].map(([k,l])=>`<label><input type="checkbox" data-expd="${k}" ${UI.exp.disc[k]?'checked':''}>${l}</label>`).join('')}
+       ${[['arch','Architectural'],['elec','Electrical & lighting'],['db','Distribution board schedules'],['plumb','Plumbing & gas'],['walls','Wall works']].map(([k,l])=>`<label><input type="checkbox" data-expd="${k}" ${UI.exp.disc[k]?'checked':''}>${l}</label>`).join('')}
        <div class="muted" style="font-size:11.5px;margin-top:4px">Levels</div>
        ${LEVELS.map((l,i)=>`<label><input type="checkbox" data-expl="${i}" ${UI.exp.levels[i]?'checked':''}>${l}</label>`).join('')}
        <button class="btn primary" type="button" id="expBtn" ${UI.exp.busy?'disabled':''}>${UI.exp.busy?'Building PDF…':'Download PDF (A3)'}</button>
@@ -1014,9 +1040,10 @@ function renderPlans(){
    <aside class="right">
      ${selP?`<div style="display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px"><div style="display:flex;gap:8px;align-items:center"><span class="glyph" style="--c:${SEC[PT[selP.type].sector].color}">${PT[selP.type].g}</span><b>${PT[selP.type].label}</b><span class="muted">· ${esc(roomName(selP.roomId))}</span></div>
        <label class="f" for="ptLabel">Label<input id="ptLabel" value="${esc(selP.label||'')}" placeholder="e.g. Double socket by bed, 30 cm"></label>
+       ${['electrical','lighting'].includes(PT[selP.type].sector)?`<label class="f" for="ptCirc">Circuit<select id="ptCirc"><option value="">Not assigned</option>${circuitList().filter(c=>c.kind!=='submain').map(c=>`<option value="${c.id}" ${selP.circuitId===c.id?'selected':''}>${esc(cref(c))} ${esc(c.name||'')}</option>`).join('')}</select></label>${circuitList().length?'':'<span class="muted" style="font-size:12px">Add circuits on the Electrical page first.</span>'}`:''}
        <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="ptDone" ${selP.done?'checked':''}> Installed / done</label>
        <div style="display:flex;justify-content:space-between"><button class="btn small" type="button" id="ptClose">Close</button><button class="btn small danger" type="button" id="ptDel">Delete point</button></div></div>`:
-       `<p class="muted" style="font-size:12.5px;margin:0">${UI.tool==='select'?'Pick a point type on the left, then click inside a room to place it. Click a point to edit it, or drag it to move it.':'Click inside a room to place a '+PT[UI.tool].label.toLowerCase()+'.'}</p>`}
+       `<p class="muted" style="font-size:12.5px;margin:0">${UI.tool.startsWith('db:')?'Click inside a room to place '+esc(S.boards[UI.tool.slice(3)]?.name||'the board')+'.':UI.tool==='select'?'Pick a point type on the left, then click inside a room to place it. Click a point to edit it, or drag it to move it.':'Click inside a room to place a '+PT[UI.tool].label.toLowerCase()+'.'}</p>`}
      <div>${H3(LEVELS[lv])}<div class="muted num" style="font-size:12.5px">Electrical & lighting done ${counts(['electrical','lighting'])} · Plumbing done ${counts(['plumbing'])}</div></div>
      <div class="pt-list">${rs.map(r=>{const l=pts.filter(p=>p.roomId===r.id);if(!l.length)return'';return `<div class="muted" style="font:600 11px var(--display);letter-spacing:.06em;text-transform:uppercase;margin-top:6px">${esc(r.name)}</div>`+l.map(p=>{const ty=PT[p.type];return `<div class="pt-row${UI.planSel===p.id?' sel':''}" data-ptsel="${p.id}"><span class="glyph" style="--c:${SEC[ty.sector].color};${p.done?`background:${SEC[ty.sector].color};color:#fff`:''}">${ty.g}</span>${esc(p.label||ty.label)}</div>`}).join('')}).join('')||'<div class="empty">No points on this level yet.</div>'}</div>
      ${UI.planLayers.walls?`<div>${H3('Wall colours')}${STAGES.map(s=>`<div style="display:flex;gap:6px;align-items:center;font-size:12.5px"><i style="width:18px;height:4px;background:${s.color};display:inline-block"></i>Needs ${s.label.toLowerCase()}</div>`).join('')}<div style="display:flex;gap:6px;align-items:center;font-size:12.5px"><i style="width:18px;height:4px;background:var(--good);display:inline-block"></i>Finished</div></div>`:''}
@@ -1148,12 +1175,12 @@ function importCSV(){
   if(UI.csv.prune){ for(const r of existing){ if(!seen.has(key(r.level,r.name))){ deleteRoom(r.id); del++; } } }
   UI.csv.msg=`Imported: ${up} updated, ${add} added${UI.csv.prune?`, ${del} removed`:''}.${errors.length?' Skipped: '+errors.join(' '):''}`; UI.csv.err=!!errors.length;
 }
-function backupJSON(){ return JSON.stringify({app:'house-hub',version:1,exported:new Date().toISOString(),meta:S.meta,rooms:S.rooms,tasks:S.tasks,points:S.points,items:S.items},null,2); }
+function backupJSON(){ return JSON.stringify({app:'house-hub',version:1,exported:new Date().toISOString(),meta:S.meta,rooms:S.rooms,tasks:S.tasks,points:S.points,items:S.items,boards:S.boards,circuits:S.circuits},null,2); }
 function restoreBackup(d){
-  for(const col of ['rooms','tasks','points','items']){ const keep=d[col]||{}; for(const id of Object.keys(S[col])) if(!keep[id]) store.del(col,id); for(const [id,v] of Object.entries(keep)) store.put(col,id,v); }
+  for(const col of ['rooms','tasks','points','items','boards','circuits']){ if(!d[col]&&(col==='boards'||col==='circuits')) continue; const keep=d[col]||{}; for(const id of Object.keys(S[col])) if(!keep[id]) store.del(col,id); for(const [id,v] of Object.entries(keep)) store.put(col,id,v); }
   if(d.meta) store.put('meta','house',{...d.meta});
 }
-function deleteRoom(id){ store.del('rooms',id); taskList().filter(x=>x.roomId===id).forEach(x=>{const n=clone(S.tasks[x.id]); n.roomId=''; saveTask(x.id,n);}); pointList().filter(p=>p.roomId===id).forEach(p=>store.del('points',p.id)); itemList().filter(x=>x.roomId===id).forEach(x=>{const n=clone(S.items[x.id]); n.roomId=''; store.put('items',x.id,n);}); }
+function deleteRoom(id){ store.del('rooms',id); boardList().filter(b=>b.roomId===id).forEach(b=>{const n=clone(S.boards[b.id]); n.roomId=''; delete n.x; delete n.y; store.put('boards',b.id,n);}); taskList().filter(x=>x.roomId===id).forEach(x=>{const n=clone(S.tasks[x.id]); n.roomId=''; saveTask(x.id,n);}); pointList().filter(p=>p.roomId===id).forEach(p=>store.del('points',p.id)); itemList().filter(x=>x.roomId===id).forEach(x=>{const n=clone(S.items[x.id]); n.roomId=''; store.put('items',x.id,n);}); }
 
 /* ---------- Budget ---------- */
 function unitPrice(it){ const qs=(it.quotes||[]).filter(q=>q.price!==''&&q.price!=null&&!isNaN(+q.price)); const ch=qs.find(q=>q.id===it.chosen); if(ch) return +ch.price; if(qs.length) return Math.min(...qs.map(q=>+q.price)); return it.estimate!==''&&it.estimate!=null&&!isNaN(+it.estimate)?+it.estimate:null; }
@@ -1228,10 +1255,11 @@ function openItem(id){
 function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('Could not load '+src)); document.head.appendChild(s); }); }
 const pdfSafe=s=>String(s??'').replace(/[–—]/g,'-').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/→/g,'>').replace(/[^\x20-\x7E -ÿ€]/g,'');
 function hexRgb(h){ const P=window.PDFLib; if(h==='var(--good)') h='#2c8a4b'; const m=/^#?([0-9a-f]{6})$/i.exec(h)||[0,'333333']; const n=parseInt(m[1],16); return P.rgb(((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255); }
-const DISC={arch:{title:'Architectural layout',code:'A'},elec:{title:'Electrical & lighting layout',code:'E'},plumb:{title:'Plumbing & gas layout',code:'P'},walls:{title:'Wall works schedule',code:'W'}};
+const DISC={arch:{title:'Architectural layout',code:'A'},elec:{title:'Electrical & lighting layout',code:'E'},plumb:{title:'Plumbing & gas layout',code:'P'},walls:{title:'Wall works schedule',code:'W'},db:{title:'Distribution board schedule',code:'DB'}};
 async function exportPDF(){
   const discs=Object.keys(DISC).filter(k=>UI.exp.disc[k]); const lvls=[0,1,2].filter(i=>UI.exp.levels[i]&&roomList().some(r=>r.level===i));
-  if(!discs.length||!lvls.length){ toast('Pick at least one drawing and one level that has rooms.'); return; }
+  if(discs.includes('db')&&!boardList().length){ toast('Add a distribution board on the Electrical page first.'); return; }
+  if(!discs.length||(!lvls.length&&!(discs.length===1&&discs[0]==='db'))){ toast('Pick at least one drawing and one level that has rooms.'); return; }
   if(!CAP.downloads){ toast('PDF downloads work on the published page.'); return; }
   UI.exp.busy=true; renderPlans();
   try{
@@ -1243,6 +1271,28 @@ async function exportPDF(){
   }catch(e){ console.error(e); if(e&&e.code==='declined'){} else toast(e&&e.code==='rate_limited'?'A download prompt is already open.':'Could not build the PDF. Try again.'); }
   UI.exp.busy=false; if(UI.view==='plans') renderPlans();
 }
+function drawDBSheet(P,pg,F,FB,b,sheet,total,K){
+  const {PW,PH,M,ink,grey,light}=K; const T=(t,x,y,o={})=>{ const f=o.bold?FB:F, sz=o.size||8; t=pdfSafe(t); let tx=x; const w=f.widthOfTextAtSize(t,sz); if(o.align==='center') tx=x-w/2; if(o.align==='right') tx=x-w; pg.drawText(t,{x:tx,y,size:sz,font:f,color:o.color||ink}); return w; };
+  const L=(x1,y1,x2,y2,th=.6,c=ink)=>pg.drawLine({start:{x:x1,y:y1},end:{x:x2,y:y2},thickness:th,color:c});
+  pg.drawRectangle({x:M-8,y:M-8,width:PW-2*M+16,height:PH-2*M+16,borderColor:ink,borderWidth:1});
+  let y=PH-M-12; T(`${b.name} · DISTRIBUTION BOARD SCHEDULE`,M+4,y,{bold:true,size:14}); T(`${S.meta.name||'House'} · Sheet ${sheet} of ${total} · ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`,PW-M-4,y,{size:8,align:'right',color:grey}); y-=22;
+  const r=S.rooms[b.roomId]; const feed=b.role==='sub'?circuitList().find(c=>c.kind==='submain'&&c.feeds===b.id):null;
+  const info=[['Role',b.role==='main'?'Main board (origin)':'Sub-board'],['Location',r?`${r.name}, ${LEVELS[r.level]}`:'not set'],['Ways',b.ways||'-'],[b.role==='main'?'Main switch':'Isolator',`${b.mainSwitch?b.mainSwitch+' A':'-'}${b.role==='main'?(b.poles==='DP'?' double-pole':b.poles==='SP'?' single-pole':''):''}`]];
+  if(b.role==='main') info.push(['Supply',`230 V 1-ph, TT${b.supplyA?', '+b.supplyA+' A':''}`],['Over/under voltage',b.ovuv||'not recorded'],['Earth electrode RA',b.ra!==''&&b.ra!=null?b.ra+' ohm':'not measured']);
+  else info.push(['Fed from',feed?`${cref(feed)}, ${feed.device} ${feed.curve}${feed.rating}, ${feed.cable} mm², ${feed.length||'?'} m`:'not set']);
+  info.push(['SPD',b.spd||'not recorded'],['Enclosure',b.enclosure||'not recorded']);
+  info.forEach((kv,i)=>{ const cx=M+4+(i%4)*270, cy=y-Math.floor(i/4)*13; T(kv[0],cx,cy,{size:7,color:grey}); T(String(kv[1]),cx+78,cy,{size:7.5}); }); y-=Math.ceil(info.length/4)*13+10;
+  const cols=[['Way',30],['Circuit',170],['Type',110],['Device',52],['Rating',48],['kA',28],['RCD',62],['AFDD',34],['Live/cpc mm²',66],['Method',60],['Length',44],['Points',40],['V drop',44],['Checks',300]];
+  let x=M+4; L(M,y+3,PW-M,y+3,.8); cols.forEach(([h,w])=>{ T(h,x,y-8,{bold:true,size:7}); x+=w; }); y-=13; L(M,y,PW-M,y,.5,ink); y-=11;
+  const chk=elecChecks();
+  for(const c of circuitList().filter(c=>c.boardId===b.id)){ if(y<M+40) break; const n=elecPts().filter(p=>p.circuitId===c.id).length; const vd=circuitVd(c); const ck=chk.filter(k=>k.cid===c.id&&k.level!=='info');
+    const vals=[c.way,c.name||'',KIND[c.kind]?.label+(c.kind==='submain'?' > '+(S.boards[c.feeds]?.name||'?'):''),c.device,`${c.curve}${c.rating} A`,c.kA,c.device==='MCB'?'-':`${c.rcdMa} mA ${c.rcdType}`,c.afdd?'yes':'-',`${c.cable}/${c.cpc}`,METHODS[c.method]?.short||'',c.length?c.length+' m':'-',c.kind==='submain'?'-':n,vd!=null?(vd/2.3).toFixed(1)+'%':'-',ck.length?ck.map(k=>(k.level==='error'?'FIX: ':'CHECK: ')+k.ref).join('; '):'OK'];
+    x=M+4; vals.forEach((v,i)=>{ let t=pdfSafe(String(v??'')); const w=cols[i][1]-4; const f=i===13?F:F; while(t.length>3&&f.widthOfTextAtSize(t,7)>w) t=t.slice(0,-2); if(t!==pdfSafe(String(v??''))) t=t.slice(0,-1)+'…'; T(t.replace('…','...'),x,y,{size:7,color:i===13&&ck.some(k=>k.level==='error')?P.rgb(.75,.25,.17):ink}); x+=cols[i][1]; }); L(M,y-4,PW-M,y-4,.3,light); y-=13; }
+  y-=10; T('CHECKS AND NOTES (BS 7671 18th Edition and Malta Electrical Installations Regulations)',M+4,y,{bold:true,size:8}); y-=12;
+  for(const k of chk.filter(k=>k.bid===b.id||(!k.bid&&k.level!=='info'))){ if(y<M+24) break; const pre=(k.level==='error'?'MUST FIX':k.level==='warn'?'CHECK':'NOTE')+(k.src?' ['+k.src+']':'')+(k.ref?' '+k.ref:'')+': ';
+    let t=pdfSafe(pre+k.text); const maxW=PW-2*M-12; while(t.length){ let cut=t.length; while(F.widthOfTextAtSize(t.slice(0,cut),6.8)>maxW) cut=t.lastIndexOf(' ',cut-1); if(cut<=0) cut=t.length; T(t.slice(0,cut),M+4,y,{size:6.8,color:k.level==='error'?P.rgb(.75,.25,.17):ink}); y-=9.5; t=t.slice(cut).trimStart(); if(y<M+24) break; } y-=2; }
+  T('Planning aid only. The installation must be designed, tested and certified by an authorised electrician or warranted engineer in Malta.',M+4,M,{size:6,color:grey});
+}
 async function buildPDF(discs,lvls){
   const P=window.PDFLib; const pdf=await P.PDFDocument.create(); pdf.setTitle(pdfSafe((S.meta.name||'House')+' drawings')); pdf.setCreator('House Completion Hub');
   const F=await pdf.embedFont(P.StandardFonts.Helvetica), FB=await pdf.embedFont(P.StandardFonts.HelveticaBold);
@@ -1252,9 +1302,11 @@ async function buildPDF(discs,lvls){
   const scales=[20,25,50,75,100,125,150,200,250,500]; let sc=scales.find(s=>bw*2834.65/s<=aw&&bh*2834.65/s<=ah)||500; const k=2834.65/sc;
   const ox=M+(aw-bw*k)/2+pad*k, oyTop=M+10+(ah-bh*k)/2+pad*k;
   const X=x=>ox+(x-b.x0)*k, Y=y=>PH-(oyTop+(y-b.y0)*k);
-  const total=discs.length*lvls.length; let sheet=0;
-  for(const disc of discs) for(const lv of lvls){
-    sheet++; const pg=pdf.addPage([PW,PH]); const rs=roomList().filter(r=>r.level===lv);
+  const sheets=[]; for(const disc of discs){ if(disc==='db') boardList().forEach(b=>sheets.push({disc,b})); else lvls.forEach(lv=>sheets.push({disc,lv})); }
+  const total=sheets.length; let sheet=0;
+  for(const sh of sheets){ const disc=sh.disc, lv=sh.lv;
+    sheet++; const pg=pdf.addPage([PW,PH]);
+    if(disc==='db'){ drawDBSheet(P,pg,F,FB,sh.b,sheet,total,{PW,PH,M,ink,grey,light}); continue; } const rs=roomList().filter(r=>r.level===lv);
     const T=(t,x,y,o={})=>{ const f=o.bold?FB:F, sz=o.size||8; t=pdfSafe(t); let tx=x; const w=f.widthOfTextAtSize(t,sz); if(o.align==='center') tx=x-w/2; if(o.align==='right') tx=x-w; pg.drawText(t,{x:tx,y,size:sz,font:f,color:o.color||ink,rotate:o.rotate?P.degrees(o.rotate):undefined}); return w; };
     const L=(x1,y1,x2,y2,th=.6,c=ink,dash)=>pg.drawLine({start:{x:x1,y:y1},end:{x:x2,y:y2},thickness:th,color:c,dashArray:dash});
     // frame
@@ -1279,6 +1331,7 @@ async function buildPDF(discs,lvls){
     const pts=pointList().filter(p=>PT[p.type]&&secs.includes(PT[p.type].sector)&&rs.some(r=>r.id===p.roomId));
     for(const p of pts){ const ty=PT[p.type]; const c=hexRgb(SEC[ty.sector].color); const x=X(p.x), y=Y(p.y);
       pg.drawCircle({x,y,size:6.5,color:p.done?c:P.rgb(1,1,1),borderColor:c,borderWidth:1.1}); T(ty.g,x,y-2.1,{bold:true,size:ty.g.length>1?4.6:6,align:'center',color:p.done?P.rgb(1,1,1):c});
+      const cc=p.circuitId&&S.circuits[p.circuitId]; if(cc) T(cref(cc),x-6,y+8.5,{size:5.2,bold:true,color:ink});
       if(p.label) T(p.label,x+9,y-2.5,{size:5.5,color:grey}); }
     // overall dims
     const W=b.x1-b.x0, D=b.y1-b.y0; const dy=Y(b.y0)+.7*k, dx=X(b.x0)-.7*k;
@@ -1354,8 +1407,251 @@ function handleExtraChange(t){
 }
 document.addEventListener('input',e=>{ const t=e.target; if(t.id==='bq'){ UI.bf.q=t.value; clearTimeout(window._bq); window._bq=setTimeout(()=>{ const pos=t.selectionStart; t.blur(); renderBudget(); const n=$('#bq'); if(n){n.focus(); try{n.setSelectionRange(pos,pos);}catch(_){}} },250); } if(t.id==='csvText') UI.csv.text=t.value; });
 
+/* ---------- Electrical: boards, circuits, checks ---------- */
+const KINDS=[
+  {key:'lighting',label:'Lighting',d:{rating:6,cable:1.5,cpc:1.5}},
+  {key:'ring',label:'Sockets – ring final',d:{rating:32,cable:2.5,cpc:1.5}},
+  {key:'radial',label:'Sockets – radial',d:{rating:20,cable:2.5,cpc:1.5}},
+  {key:'cooker',label:'Cooker / oven / hob',d:{rating:32,cable:6,cpc:2.5}},
+  {key:'water',label:'Water heater',d:{rating:16,cable:2.5,cpc:1.5}},
+  {key:'ac',label:'A/C unit',d:{rating:16,cable:2.5,cpc:1.5}},
+  {key:'shower',label:'Electric shower',d:{rating:40,cable:10,cpc:4}},
+  {key:'dedicated',label:'Dedicated appliance (washer, dryer, pump…)',d:{rating:16,cable:2.5,cpc:1.5}},
+  {key:'outdoor',label:'Outdoor / roof',d:{rating:16,cable:2.5,cpc:1.5}},
+  {key:'submain',label:'Sub-main to another board',d:{rating:40,cable:10,cpc:10}}
+];
+const KIND=Object.fromEntries(KINDS.map(k=>[k.key,k]));
+// Current-carrying capacity (A), 70°C PVC copper, 30°C ambient, single-phase. BS 7671 Appendix 4 tables 4D1A (singles) and 4D5 (twin & earth).
+const METHODS={
+  B1:{label:'Singles in conduit, in/on wall (Method B)',short:'B singles',iz:{1:13.5,1.5:17.5,2.5:24,4:32,6:41,10:57,16:76,25:101}},
+  B2:{label:'Twin & earth in conduit/trunking (Method B)',short:'B T&E',iz:{1:13,1.5:16.5,2.5:23,4:30,6:38,10:52,16:69}},
+  C:{label:'Twin & earth clipped direct (Method C)',short:'C T&E',iz:{1:16,1.5:20,2.5:27,4:37,6:47,10:64,16:85}},
+  A:{label:'In conduit in a thermally insulated wall (Method A)',short:'A',iz:{1:11,1.5:14.5,2.5:19.5,4:26,6:34,10:46,16:61,25:80}}
+};
+const MVAM={1:44,1.5:29,2.5:18,4:11,6:7.3,10:4.4,16:2.8,25:1.75}; // mV/A/m, single-phase
+const SIZES=[1,1.5,2.5,4,6,10,16,25];
+const RATINGS=[6,10,13,16,20,25,32,40,45,50,63];
+const boardList=()=>Object.entries(S.boards).map(([id,b])=>({id,...b})).sort((a,b)=>(a.role==='main'?0:1)-(b.role==='main'?0:1)||String(a.name).localeCompare(String(b.name)));
+const circuitList=()=>Object.entries(S.circuits).map(([id,c])=>({id,...c})).sort((a,b)=>(+a.way||99)-(+b.way||99));
+const cref=c=>{ const b=S.boards[c.boardId]; return (b?b.name:'?')+'/'+(c.way||'?'); };
+const isBathRoom=r=>r&&/bath|shower|en-?suite/i.test(r.name)&&!r.outdoor;
+const elecPts=()=>pointList().filter(p=>PT[p.type]&&['electrical','lighting'].includes(PT[p.type].sector));
+function circuitVd(c,depth=0){
+  const mv=MVAM[c.cable], L=+c.length; if(!mv||!L||!c.rating) return null;
+  let vd=mv*c.rating*L/1000; if(c.kind==='ring') vd/=4;
+  const b=S.boards[c.boardId]; if(b&&b.role==='sub'&&depth<3){ const feed=circuitList().find(x=>x.kind==='submain'&&x.feeds===c.boardId); if(feed){ const up=circuitVd(feed,depth+1); if(up!=null) vd+=up; } }
+  return vd;
+}
+function circuitArea(c){ const ids=new Set(elecPts().filter(p=>p.circuitId===c.id).map(p=>p.roomId)); let a=0; ids.forEach(id=>{const r=S.rooms[id]; if(r) a+=r.w*r.d;}); return a; }
+function elecChecks(){
+  const out=[]; const add=(level,src,ref,text,bid,cid)=>out.push({level,src,ref,text,bid:bid||'',cid:cid||''});
+  const boards=boardList(), circs=circuitList(), pts=elecPts();
+  if(!boards.length) add('info','','', 'Add your distribution boards to start the checks.');
+  for(const b of boards){
+    const cs=circs.filter(c=>c.boardId===b.id);
+    if(b.role==='main'){
+      if(b.poles==='SP') add('error','MT','Malta EIR · BS 7671 462.1.201',`${b.name}: the main switch is single-pole. Malta's regulations require a double-pole main circuit breaker, and BS 7671 asks for a double-pole main switch in a dwelling.`,b.id);
+      else if(!b.poles) add('info','MT','Malta EIR',`${b.name}: record the main switch. It must be double-pole.`,b.id);
+      if(b.ovuv==='no') add('error','MT','Malta EIR',`${b.name}: no over/under-voltage protection device. Malta's regulations require one at the origin, with the 30 mA RCDs fitted after it.`,b.id);
+      else if(!b.ovuv) add('info','MT','Malta EIR',`${b.name}: record whether the over/under-voltage device is fitted. It is required in Malta.`,b.id);
+      const ra=+b.ra;
+      if(b.ra!==''&&b.ra!=null&&!isNaN(ra)){ if(ra*0.03>50) add('error','UK','BS 7671 411.5.3',`${b.name}: earth electrode resistance ${ra} Ω is too high even for a 30 mA RCD (RA × IΔn must not exceed 50 V, so RA ≤ 1,667 Ω).`,b.id); else if(ra>200) add('warn','UK','BS 7671 Table 41.5 note',`${b.name}: earth electrode resistance ${ra} Ω. Values above 200 Ω may not be stable through dry summers; add or deepen electrodes.`,b.id); }
+      else add('info','MT','Malta EIR reg 22 · BS 7671 542',`${b.name}: TT earthing. Use one or more earth electrodes with a copper earthing conductor of at least 16 mm². Metal water pipes are not acceptable as the earth. Record the measured electrode resistance (RA) here.`,b.id);
+    }
+    if(b.role==='sub'&&!circs.some(c=>c.kind==='submain'&&c.feeds===b.id)) add('warn','','',`${b.name}: no sub-main circuit feeds this board yet. Add a "Sub-main to another board" circuit on the board that supplies it.`,b.id);
+    if(b.spd==='no') add('warn','UK','BS 7671 443.4 · 534',`${b.name}: no surge protective device (SPD). One is expected unless a risk assessment shows it is not needed; fit it at or near the origin.`,b.id);
+    else if(!b.spd&&b.role==='main') add('info','UK','BS 7671 443.4',`${b.name}: record whether a surge protective device (SPD) is fitted.`,b.id);
+    if(b.enclosure==='plastic') add('warn','UK','BS 7671 421.1.201',`${b.name}: a consumer unit in a dwelling should have a non-combustible (e.g. steel) enclosure.`,b.id);
+    const used=cs.length; if(+b.ways&&used>+b.ways) add('error','','',`${b.name}: ${used} circuits but only ${b.ways} ways. Use a bigger board.`,b.id); else if(+b.ways&&+b.ways-used<2) add('info','','',`${b.name}: ${+b.ways-used} spare way${+b.ways-used===1?'':'s'} left. Leave room for future circuits.`,b.id);
+  }
+  for(const c of circs){
+    const ref=`${cref(c)} ${c.name||KIND[c.kind]?.label||''}`; const cp=pts.filter(p=>p.circuitId===c.id);
+    const rcd=c.device==='RCBO'||c.device==='RCD+MCB';
+    if(c.kind!=='submain'){
+      if(!rcd) add('error','MT','Malta EIR reg 20(5) · BS 7671 411.3.3 / 411.3.4 / 522.6.202',`${ref}: no 30 mA RCD. Malta requires 30 mA RCD protection on each sub-circuit; BS 7671 requires it for sockets up to 32 A, for lighting in dwellings and for cables concealed less than 50 mm deep in walls.`,c.boardId,c.id);
+      else if(+c.rcdMa>30) add('error','MT','Malta EIR reg 20(5) · BS 7671 411.3.3',`${ref}: RCD is ${c.rcdMa} mA. It must be 30 mA (Malta allows up to 300 mA only for a specific high-leakage load).`,c.boardId,c.id);
+      if(rcd&&c.device==='RCD+MCB') add('warn','MT','Malta EIR reg 20(5) · BS 7671 314.1',`${ref}: shares an RCD with other circuits. Malta's regulations call for RCDs protecting sub-circuits separately; an RCBO per circuit meets this and stops one fault from tripping several circuits.`,c.boardId,c.id);
+      if(rcd&&c.rcdType==='AC') add('warn','UK','BS 7671 531.3.3',`${ref}: Type AC RCD. Use Type A or better: Type AC only suits fixed equipment known to produce no DC components.`,c.boardId,c.id);
+      if(rcd&&c.kind==='ac'&&c.rcdType==='A') add('info','UK','BS 7671 531.3.3',`${ref}: inverter A/C units can need a Type F RCD. Check the manufacturer's instructions.`,c.boardId,c.id);
+    }
+    const m=METHODS[c.method]; const iz=m&&m.iz[c.cable];
+    if(c.rating&&c.cable){ if(iz==null) add('info','UK','BS 7671 Appendix 4',`${ref}: no rating table entry for ${c.cable} mm² with this installation method; check the cable rating by hand.`,c.boardId,c.id);
+      else if(c.kind==='ring'){ if(iz<0.67*(+c.rating)) add('error','UK','BS 7671 433.1.204',`${ref}: a ${c.rating} A ring needs each leg rated at least ${(0.67*c.rating).toFixed(0)} A; ${c.cable} mm² here is about ${iz} A (${m.short}).`,c.boardId,c.id); }
+      else if(+c.rating>iz) add('error','UK','BS 7671 433.1.1',`${ref}: ${c.rating} A device on ${c.cable} mm² cable rated about ${iz} A (${m.short}). The device must not exceed the cable's rating.`,c.boardId,c.id);
+      else if(c.kind!=='ring'&&+c.rating>iz*0.94) add('warn','UK','BS 7671 Appendix 4 Table 4B1',`${ref}: ${c.rating} A is within 6% of the cable's ${iz} A rating. At a 35 °C ambient (common in Maltese summers, roof spaces, sunny walls) the rating drops by about 6%; grouping with other circuits reduces it further.`,c.boardId,c.id); }
+    if(c.kind==='ring'){ if(c.rating&&![30,32].includes(+c.rating)) add('warn','UK','BS 7671 Appendix 15',`${ref}: a ring final is normally protected at 30 or 32 A.`,c.boardId,c.id); if(c.cable&&+c.cable<2.5) add('error','UK','BS 7671 Appendix 15',`${ref}: a ring final needs at least 2.5 mm² live conductors.`,c.boardId,c.id); const a=circuitArea(c); if(a>100) add('warn','UK','BS 7671 Appendix 15',`${ref}: serves about ${a.toFixed(0)} m², over the 100 m² guide for one ring. Split it.`,c.boardId,c.id); }
+    if(c.kind==='radial'){ if(+c.rating>20&&+c.cable<4) add('error','UK','BS 7671 Appendix 15',`${ref}: a ${c.rating} A socket radial needs 4 mm² cable.`,c.boardId,c.id); const a=circuitArea(c), lim=+c.rating>20?75:50; if(a>lim) add('warn','UK','BS 7671 Appendix 15',`${ref}: serves about ${a.toFixed(0)} m², over the ${lim} m² guide for a ${+c.rating>20?'32':'20'} A radial.`,c.boardId,c.id); }
+    if(c.kind==='lighting'){ if(+c.rating>16) add('error','UK','BS 7671 Table 55.1',`${ref}: lighting circuits with B22 or E27 lampholders must be protected at 16 A or less.`,c.boardId,c.id); else if(+c.rating>10) add('info','','',`${ref}: lighting is usually 6 or 10 A.`,c.boardId,c.id); const n=cp.filter(p=>p.type==='light').length; if(n>15) add('info','','',`${ref}: ${n} light points. Consider splitting so one fault doesn't leave a whole floor dark.`,c.boardId,c.id); }
+    if(c.kA&&+c.kA<6) add('warn','UK','BS 7671 434.5.1 · 536.1',`${ref}: ${c.kA} kA breaking capacity. Check it against the prospective fault current at the board; 6 kA is the usual domestic minimum.`,c.boardId,c.id);
+    if(c.curve==='D') add('warn','','',`${ref}: Type D breakers are rarely right in a home and need a very low earth fault loop impedance. Use B (or C for motor loads).`,c.boardId,c.id);
+    const vd=circuitVd(c); if(vd!=null){ const lim=c.kind==='lighting'?6.9:11.5; const pct=vd/230*100; if(vd>lim) add('warn','UK','BS 7671 525 · Appendix 4 Table 4Ab',`${ref}: estimated voltage drop ${pct.toFixed(1)}% (${vd.toFixed(1)} V) at full breaker rating, over the ${c.kind==='lighting'?3:5}% limit. Use a larger cable or shorter run; this estimate is conservative.`,c.boardId,c.id); }
+    else if(c.kind!=='submain') add('info','','',`${ref}: add the cable length to check voltage drop.`,c.boardId,c.id);
+    if(!cp.length&&['ring','radial','lighting'].includes(c.kind)) add('info','','',`${ref}: no points assigned yet.`,c.boardId,c.id);
+    if(['ring','radial'].includes(c.kind)&&!c.afdd) add('info','UK','BS 7671 421.1.7 (A2:2022)',`${ref}: arc fault detection (AFDD) is recommended for socket circuits in the UK's current text. It is not in the 2018 text Malta refers to.`,c.boardId,c.id);
+  }
+  for(const p of pts){ const r=S.rooms[p.roomId]; if(p.type==='socket'&&isBathRoom(r)) add('error','UK','BS 7671 701.512.3',`Socket in ${r.name}: sockets in a room with a bath or shower must be at least 2.5 m from the zone 1 boundary. Shaver supply units are allowed closer.`,'',p.circuitId||''); }
+  const un=pts.filter(p=>!p.circuitId||!S.circuits[p.circuitId]); if(un.length) add('info','','',`${un.length} electrical or lighting point${un.length===1?' is':'s are'} not assigned to a circuit yet.`);
+  return out;
+}
+const SEV={error:{label:'Must fix',c:'var(--bad)'},warn:{label:'Check',c:'var(--warn)'},info:{label:'Note',c:'var(--accent)'}};
+
+/* ----- Single-line diagram ----- */
+function sldSVG(b){
+  const cs=circuitList().filter(c=>c.boardId===b.id); const ways=Math.max(+b.ways||0,cs.length); const colW=78, x0=230, busY=150;
+  const W=x0+Math.max(1,ways)*colW+30, H=520; const chk=elecChecks(); const bad=id=>chk.some(k=>k.cid===id&&k.level==='error');
+  const T=(x,y,t,o='')=>`<text x="${x}" y="${y}" ${o} font-family="IBM Plex Sans Condensed, sans-serif" fill="var(--ink)">${esc(t)}</text>`;
+  const box=(x,y,w,h,lines,stroke='var(--ink)')=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="5" fill="var(--panel)" stroke="${stroke}" stroke-width="1.4"/>`+lines.map((l,i)=>T(x+w/2,y+16+i*14,l,`text-anchor="middle" font-size="${i?10.5:12}" ${i?'':'font-weight="600"'}`)).join('');
+  let g='';
+  const feed=b.role==='sub'?circuitList().find(c=>c.kind==='submain'&&c.feeds===b.id):null;
+  if(b.role==='main'){
+    g+=box(20,14,170,36,['Supply',`230 V 1-phase · TT${b.supplyA?' · '+b.supplyA+' A':''}`]);
+    g+=`<line x1="105" y1="50" x2="105" y2="62" stroke="var(--ink)" stroke-width="1.6"/>`;
+    g+=box(20,62,170,34,['Over/under voltage',b.ovuv==='yes'?'fitted':b.ovuv==='no'?'MISSING':'not recorded'],b.ovuv==='no'?'var(--bad)':'var(--ink)');
+    g+=`<line x1="105" y1="96" x2="105" y2="106" stroke="var(--ink)" stroke-width="1.6"/>`;
+    g+=box(20,106,170,34,['Main switch',`${b.poles==='SP'?'single-pole':b.poles==='DP'?'double-pole':'poles ?'}${b.mainSwitch?' · '+b.mainSwitch+' A':''}`],b.poles==='SP'?'var(--bad)':'var(--ink)');
+  } else {
+    g+=box(20,62,170,48,['Fed from',feed?`${cref(feed)} · ${feed.device==='MCB'?'MCB':feed.device} ${feed.curve||''}${feed.rating||''}`:'no sub-main yet',feed?`${feed.cable||'?'} mm² · ${feed.length||'?'} m`:''],feed?'var(--ink)':'var(--warn)');
+    g+=box(20,116,170,24,[`Isolator${b.mainSwitch?' '+b.mainSwitch+' A':''}`]);
+  }
+  g+=`<line x1="190" y1="128" x2="${x0-30}" y2="128" stroke="var(--ink)" stroke-width="1.6"/><line x1="${x0-30}" y1="128" x2="${x0-30}" y2="${busY}" stroke="var(--ink)" stroke-width="1.6"/>`;
+  g+=`<line x1="${x0-40}" y1="${busY}" x2="${W-20}" y2="${busY}" stroke="var(--ink)" stroke-width="5" stroke-linecap="round"/>`;
+  g+=T(W-20,busY-10,`${b.name} busbar`,'text-anchor="end" font-size="11" font-weight="600" fill="var(--muted)"');
+  // SPD + MET
+  g+=`<line x1="${x0-30}" y1="${busY}" x2="${x0-30}" y2="${busY+40}" stroke="var(--ink)" stroke-width="1.4" stroke-dasharray="${b.spd==='yes'?'0':'4 3'}"/>`;
+  g+=box(x0-80,busY+40,100,34,['SPD',b.spd==='yes'?'Type 2 fitted':b.spd==='no'?'not fitted':'not recorded'],b.spd==='no'?'var(--warn)':'var(--ink)');
+  if(b.role==='main'){ g+=box(20,busY+120,170,48,['Main earthing terminal','earth electrode(s), 16 mm² Cu',`RA = ${b.ra!==''&&b.ra!=null?b.ra+' Ω':'not measured'}`]);
+    const ex=105, ey=busY+168; g+=`<line x1="${ex}" y1="${ey}" x2="${ex}" y2="${ey+16}" stroke="var(--ink)" stroke-width="1.4"/>`+[0,1,2].map(i=>`<line x1="${ex-14+i*5}" y1="${ey+16+i*5}" x2="${ex+14-i*5}" y2="${ey+16+i*5}" stroke="var(--ink)" stroke-width="1.4"/>`).join(''); }
+  for(let i=0;i<Math.max(1,ways);i++){
+    const c=cs[i]; const x=x0+i*colW+colW/2;
+    if(!c){ g+=`<line x1="${x}" y1="${busY}" x2="${x}" y2="${busY+40}" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="3 3"/>`+T(x,busY+56,'spare','text-anchor="middle" font-size="10.5" fill="var(--muted)"'); continue; }
+    const col=SEC[c.kind==='lighting'?'lighting':'electrical'].color; const stroke=bad(c.id)?'var(--bad)':'var(--ink)';
+    g+=`<g data-circ="${c.id}" style="cursor:pointer"><line x1="${x}" y1="${busY}" x2="${x}" y2="${busY+28}" stroke="var(--ink)" stroke-width="1.4"/>`;
+    g+=`<rect x="${x-30}" y="${busY+28}" width="60" height="50" rx="5" fill="var(--panel)" stroke="${stroke}" stroke-width="${bad(c.id)?2.2:1.4}"/>`;
+    g+=T(x,busY+43,c.device||'?','text-anchor="middle" font-size="10" fill="var(--muted)"')+T(x,busY+58,`${c.curve||''}${c.rating||'?'}`,'text-anchor="middle" font-size="14" font-weight="700"')+T(x,busY+72,c.device==='MCB'?(c.kA?c.kA+' kA':''):`${c.rcdMa||30}mA ${c.rcdType||''}`,'text-anchor="middle" font-size="9.5" fill="var(--muted)"');
+    g+=`<line x1="${x}" y1="${busY+78}" x2="${x}" y2="${busY+100}" stroke="${col}" stroke-width="2.4"/>`;
+    g+=`<circle cx="${x}" cy="${busY+110}" r="11" fill="${col}"/>`+T(x,busY+114,String(c.way||i+1),'text-anchor="middle" font-size="11" font-weight="700" fill="#fff"');
+    const n=elecPts().filter(p=>p.circuitId===c.id).length; const vd=circuitVd(c);
+    g+=`<text transform="translate(${x-4} ${busY+130}) rotate(90)" font-family="IBM Plex Sans Condensed, sans-serif" font-size="12" font-weight="600" fill="var(--ink)">${esc((c.name||KIND[c.kind]?.label||'').slice(0,34))}</text>`;
+    g+=`<text transform="translate(${x+10} ${busY+130}) rotate(90)" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--muted)">${esc(`${c.cable||'?'}/${c.cpc||'?'} mm² · ${c.length||'?'} m${c.kind==='submain'?' → '+(S.boards[c.feeds]?.name||'?'):` · ${n} pts`}${vd!=null?` · ${(vd/2.3).toFixed(1)}%`:''}`)}</text></g>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(b.name)} single-line diagram" style="max-width:none">${g}</svg>`;
+}
+
+/* ----- Electrical view ----- */
+function renderElectrical(){
+  const bs=boardList(); if(UI.board&&!S.boards[UI.board]) UI.board=null; if(!UI.board&&bs.length) UI.board=bs[0].id;
+  const b=UI.board?{id:UI.board,...S.boards[UI.board]}:null; const chk=elecChecks();
+  const cnt=l=>chk.filter(k=>k.level===l).length;
+  const filt=UI.chkFilter||'board'; const shown=chk.filter(k=>filt==='all'||!k.bid||k.bid===UI.board).sort((a,c)=>['error','warn','info'].indexOf(a.level)-['error','warn','info'].indexOf(c.level));
+  const cs=b?circuitList().filter(c=>c.boardId===b.id):[];
+  const un=elecPts().filter(p=>!p.circuitId||!S.circuits[p.circuitId]);
+  const sel=(id,opts,val)=>`<select class="inp" id="${id}">${opts.map(([v,l])=>`<option value="${v}" ${String(val??'')===String(v)?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
+  const yn=[['','Not recorded'],['yes','Yes'],['no','No']];
+  $('#main').innerHTML=`<div class="page">
+   <div class="toolbar"><div class="seg" role="tablist" aria-label="Distribution boards">${bs.map(x=>`<button type="button" data-board="${x.id}" aria-pressed="${x.id===UI.board}">${esc(x.name)}${x.role==='main'?' · main':' · sub'}</button>`).join('')}</div>
+     <button class="btn" type="button" id="addBoard">+ Add board</button>
+     <span style="margin-left:auto;display:flex;gap:8px;align-items:center"><span class="pill" style="background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)">${cnt('error')} must fix</span><span class="pill waiting">${cnt('warn')} to check</span><span class="pill doing">${cnt('info')} notes</span></span></div>
+   ${b?`<div class="elec-grid"><div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+     <section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>${esc(b.name)} details</h2><span style="display:flex;gap:6px"><button class="btn small" type="button" id="placeBoard">${b.x!=null?'Move on plan':'Place on plan'}</button><button class="btn small danger" type="button" id="delBoard">${UI.confirmDel===b.id?'Click again to delete':'Delete board'}</button></span></div>
+       <div class="egrid">
+        <label class="f" for="bdName">Name<input id="bdName" value="${esc(b.name)}"></label>
+        <label class="f" for="bdRole">Role${sel('bdRole',[['main','Main board (origin)'],['sub','Sub-board']],b.role)}</label>
+        <label class="f" for="bdRoom">Location${sel('bdRoom',[['','Not set'],...roomList().map(r=>[r.id,`${r.name} (${LEVELS[r.level].split(' ')[0]})`])],b.roomId)}</label>
+        <label class="f" for="bdWays">Ways (modules for circuits)<input id="bdWays" type="number" min="1" value="${esc(b.ways??'')}"></label>
+        <label class="f" for="bdMain">${b.role==='main'?'Main switch rating (A)':'Isolator rating (A)'}<input id="bdMain" type="number" min="0" value="${esc(b.mainSwitch??'')}"></label>
+        ${b.role==='main'?`<label class="f" for="bdPoles">Main switch poles${sel('bdPoles',[['','Not recorded'],['DP','Double-pole'],['SP','Single-pole']],b.poles)}</label>
+        <label class="f" for="bdOv">Over/under voltage device${sel('bdOv',yn,b.ovuv)}</label>
+        <label class="f" for="bdRa">Earth electrode RA (Ω)<input id="bdRa" type="number" min="0" step="0.1" value="${esc(b.ra??'')}" placeholder="measured"></label>
+        <label class="f" for="bdSupply">Supply / cut-out rating (A)<input id="bdSupply" type="number" min="0" value="${esc(b.supplyA??'')}"></label>`:''}
+        <label class="f" for="bdSpd">Surge protection (SPD)${sel('bdSpd',yn,b.spd)}</label>
+        <label class="f" for="bdEnc">Enclosure${sel('bdEnc',[['','Not recorded'],['metal','Metal (non-combustible)'],['plastic','Plastic']],b.enclosure)}</label>
+       </div></section>
+     <section class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>Wiring diagram</h2><span class="muted" style="font-size:12px">Click a circuit to edit it. Red outline = must-fix issue.</span></div><div class="sld">${sldSVG(b)}</div></section>
+     <section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>Circuit schedule</h2><span style="display:flex;gap:6px">${cs.length?'':'<button class="btn small" type="button" id="tplCirc">Add typical home circuits</button>'}<button class="btn small primary" type="button" id="addCirc">+ Add circuit</button></span></div>
+       ${cs.length?`<div class="tbl-wrap"><table class="btbl"><thead><tr><th>Way</th><th>Circuit</th><th>Protection</th><th>RCD</th><th>Cable</th><th class="r">Length</th><th class="r">Points</th><th class="r">V drop</th><th>Checks</th></tr></thead><tbody>
+       ${cs.map(c=>{ const n=elecPts().filter(p=>p.circuitId===c.id).length; const vd=circuitVd(c); const ck=chk.filter(k=>k.cid===c.id); const e=ck.filter(k=>k.level==='error').length, w=ck.filter(k=>k.level==='warn').length;
+         return `<tr data-circ="${c.id}"><td class="mono">${esc(c.way||'')}</td><td><b style="font-weight:500">${esc(c.name||KIND[c.kind]?.label)}</b><div class="muted" style="font-size:12px">${esc(KIND[c.kind]?.label||'')}${c.kind==='submain'?' → '+esc(S.boards[c.feeds]?.name||'?'):''}</div></td>
+         <td class="mono" style="white-space:nowrap">${esc(c.device||'')} ${esc(c.curve||'')}${esc(c.rating||'')}${c.kA?` · ${c.kA}kA`:''}</td><td class="mono" style="white-space:nowrap">${c.device==='MCB'?'—':`${c.rcdMa||30}mA ${c.rcdType||''}`}${c.afdd?' +AFDD':''}</td>
+         <td class="mono" style="white-space:nowrap">${esc(c.cable||'?')}/${esc(c.cpc||'?')} mm²<div class="muted" style="font-size:11px">${esc(METHODS[c.method]?.short||'')}</div></td><td class="r">${c.length?c.length+' m':'—'}</td><td class="r">${c.kind==='submain'?'—':n}</td><td class="r">${vd!=null?(vd/2.3).toFixed(1)+'%':'—'}</td>
+         <td>${e?`<span class="pill" style="background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)">${e} fix</span> `:''}${w?`<span class="pill waiting">${w} check</span>`:''}${!e&&!w?'<span class="pill done">OK</span>':''}</td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">No circuits on this board yet.</div>'}
+       <p class="muted" style="font-size:12px;margin:0">Cable ratings use BS 7671 Appendix 4 for 70 °C PVC copper at 30 °C; voltage drop is estimated at the full breaker rating (conservative), including the sub-main for sub-boards.</p></section>
+     ${un.length?`<section class="card"><h2>Points not on a circuit (${un.length})</h2><div class="un-list">${un.map(p=>{const ty=PT[p.type];return `<div class="un-row"><span class="glyph" style="--c:${SEC[ty.sector].color}">${ty.g}</span><span style="flex:1">${esc(p.label||ty.label)} <span class="muted">· ${esc(roomName(p.roomId))}</span></span><select class="inp" data-assign="${p.id}" aria-label="Assign circuit"><option value="">Assign to…</option>${circuitList().filter(c=>c.kind!=='submain').map(c=>`<option value="${c.id}">${esc(cref(c))} ${esc(c.name||'')}</option>`).join('')}</select></div>`}).join('')}</div></section>`:''}
+   </div>
+   <aside class="card checks"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Checks & notes</h2><div class="seg"><button type="button" data-chkf="board" aria-pressed="${filt==='board'}">This board</button><button type="button" data-chkf="all" aria-pressed="${filt==='all'}">All</button></div></div>
+     <div class="std">Checked against <b>BS 7671 (IET Wiring Regulations, 18th Edition)</b> and Malta's <b>Electrical Installations Regulations</b>. Malta calls up the 18th Edition; the UK's current text is BS 7671:2018+A4:2026, so items only in the newer UK text are marked UK. <span class="tag mt">MT</span> = Malta requirement · <span class="tag uk">UK</span> = BS 7671.<br><b>This is a planning aid, not a design.</b> The installation must be designed, tested and certified by an electrician or engineer with the right Malta authorisation.</div>
+     ${shown.map(k=>`<div class="chk ${k.level}"${k.cid?` data-circ="${k.cid}" style="cursor:pointer"`:''}><div class="chk-h"><span style="color:${SEV[k.level].c};font-weight:700">${SEV[k.level].label}</span>${k.src?`<span class="tag ${k.src==='MT'?'mt':'uk'}">${k.src}</span>`:''}${k.ref?`<span class="muted mono" style="font-size:10.5px">${esc(k.ref)}</span>`:''}</div><div>${esc(k.text)}</div></div>`).join('')||'<div class="empty">Nothing to flag on this board.</div>'}
+   </aside></div>`:`<div class="empty" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px">No boards yet. Add your main distribution board and the sub-board, then their circuits.</div>`}
+  </div>`;
+}
+function openCircuit(id,preset={}){
+  const bid=preset.boardId||UI.board; const used=circuitList().filter(c=>c.boardId===bid).map(c=>+c.way);
+  let way=1; while(used.includes(way)) way++;
+  const c=id?clone(S.circuits[id]):{boardId:bid,way,name:'',kind:'ring',device:'RCBO',curve:'B',rating:32,kA:6,rcdMa:30,rcdType:'A',afdd:false,cable:2.5,cpc:1.5,method:'B1',length:'',feeds:'',notes:''};
+  const pts=elecPts(); const mine=new Set(pts.filter(p=>p.circuitId===id&&id).map(p=>p.id));
+  const ov=document.createElement('div'); ov.className='overlay';
+  const opt=(arr,val)=>arr.map(([v,l])=>`<option value="${v}" ${String(val)===String(v)?'selected':''}>${esc(l)}</option>`).join('');
+  ov.innerHTML=`<form class="modal" style="width:min(720px,100%)"><h2>${id?'Edit circuit '+esc(cref(c)):'New circuit'}</h2>
+   <div class="grid3"><label class="f" for="ccBoard">Board<select id="ccBoard">${opt(boardList().map(x=>[x.id,x.name]),c.boardId)}</select></label><label class="f" for="ccWay">Way no.<input id="ccWay" type="number" min="1" value="${esc(c.way)}"></label>
+   <label class="f" for="ccKind">Type<select id="ccKind">${opt(KINDS.map(k=>[k.key,k.label]),c.kind)}</select></label></div>
+   <label class="f" for="ccName">Circuit name<input id="ccName" value="${esc(c.name)}" placeholder="e.g. Ground floor sockets, Kitchen lights"></label>
+   <div id="ccFeedsWrap" ${c.kind==='submain'?'':'hidden'}><label class="f" for="ccFeeds">Feeds board<select id="ccFeeds"><option value="">Choose…</option>${opt(boardList().filter(x=>x.id!==c.boardId).map(x=>[x.id,x.name]),c.feeds)}</select></label></div>
+   <h3 style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Breaker</h3>
+   <div class="grid3"><label class="f" for="ccDev">Device<select id="ccDev">${opt([['RCBO','RCBO (RCD + MCB in one)'],['MCB','MCB only'],['RCD+MCB','MCB under a shared RCD']],c.device)}</select></label>
+   <label class="f" for="ccCurve">Curve<select id="ccCurve">${opt([['B','Type B'],['C','Type C'],['D','Type D']],c.curve)}</select></label>
+   <label class="f" for="ccRating">Rating (A)<select id="ccRating">${opt(RATINGS.map(r=>[r,r+' A']),c.rating)}</select></label>
+   <label class="f" for="ccKa">Breaking capacity (kA)<select id="ccKa">${opt([[3,'3 kA'],[4.5,'4.5 kA'],[6,'6 kA'],[10,'10 kA']],c.kA)}</select></label>
+   <label class="f" for="ccMa">RCD sensitivity<select id="ccMa">${opt([[30,'30 mA'],[100,'100 mA'],[300,'300 mA']],c.rcdMa)}</select></label>
+   <label class="f" for="ccRt">RCD type<select id="ccRt">${opt([['A','Type A'],['F','Type F'],['B','Type B'],['AC','Type AC']],c.rcdType)}</select></label></div>
+   <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="ccAfdd" ${c.afdd?'checked':''}> Arc fault detection (AFDD)</label>
+   <h3 style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Cable</h3>
+   <div class="grid3"><label class="f" for="ccCable">Live conductors (mm²)<select id="ccCable">${opt(SIZES.map(s=>[s,s+' mm²']),c.cable)}</select></label>
+   <label class="f" for="ccCpc">Earth / cpc (mm²)<select id="ccCpc">${opt(SIZES.map(s=>[s,s+' mm²']),c.cpc)}</select></label>
+   <label class="f" for="ccLen">Longest run (m)<input id="ccLen" type="number" min="0" step="0.5" value="${esc(c.length)}"></label></div>
+   <label class="f" for="ccMethod">Installation method<select id="ccMethod">${opt(Object.entries(METHODS).map(([k,m])=>[k,m.label]),c.method)}</select></label>
+   <div id="ccPtsWrap" ${c.kind==='submain'?'hidden':''}><h3 style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Points on this circuit</h3>
+   <div class="un-list" style="max-height:220px;overflow:auto">${pts.length?roomList().map(r=>{const l=pts.filter(p=>p.roomId===r.id);if(!l.length)return'';return `<div class="muted" style="font:600 11px var(--display);letter-spacing:.06em;text-transform:uppercase;margin-top:4px">${esc(r.name)} · ${LEVELS[r.level].split(' ')[0]}</div>`+l.map(p=>{const ty=PT[p.type];const other=p.circuitId&&p.circuitId!==id&&S.circuits[p.circuitId];return `<label class="un-row"><input type="checkbox" data-cpt="${p.id}" ${mine.has(p.id)?'checked':''}><span class="glyph" style="--c:${SEC[ty.sector].color}">${ty.g}</span><span>${esc(p.label||ty.label)}${other?` <span class="muted">(now on ${esc(cref({...S.circuits[p.circuitId]}))})</span>`:''}</span></label>`}).join('')}).join(''):'<div class="empty">Place sockets, switches and light points on the Plans page first.</div>'}</div></div>
+   <label class="f" for="ccNotes">Notes<textarea id="ccNotes" rows="2">${esc(c.notes||'')}</textarea></label>
+   <div class="row-end">${id?'<button class="btn danger" type="button" id="ccDel">Delete circuit</button>':'<span></span>'}<span style="display:flex;gap:8px"><button class="btn" type="button" id="ccCancel">Cancel</button><button class="btn primary" type="submit">Save</button></span></div></form>`;
+  document.body.appendChild(ov); ov.querySelector('#ccName').focus();
+  const close=()=>{ov.remove(); render();};
+  ov.addEventListener('change',e=>{ const t=e.target; if(t.id==='ccKind'){ const k=KIND[t.value]; ov.querySelector('#ccFeedsWrap').hidden=t.value!=='submain'; ov.querySelector('#ccPtsWrap').hidden=t.value==='submain';
+      if(!id&&k){ ov.querySelector('#ccRating').value=k.d.rating; ov.querySelector('#ccCable').value=k.d.cable; ov.querySelector('#ccCpc').value=k.d.cpc; if(t.value==='submain'){ ov.querySelector('#ccDev').value='MCB'; } } } });
+  ov.addEventListener('click',e=>{ const t=e.target; if(t===ov||t.id==='ccCancel') close(); if(t.id==='ccDel'){ if(t.dataset.sure){ store.del('circuits',id); pointList().filter(p=>p.circuitId===id).forEach(p=>{const n=clone(S.points[p.id]); n.circuitId=''; savePoint(p.id,n);}); close(); } else { t.dataset.sure='1'; t.textContent='Click again to delete'; } } });
+  ov.addEventListener('keydown',e=>{ if(e.key==='Escape') close(); });
+  ov.querySelector('form').addEventListener('submit',e=>{ e.preventDefault(); const g=s=>ov.querySelector(s).value;
+    const n={...c,boardId:g('#ccBoard'),way:Number(g('#ccWay'))||way,kind:g('#ccKind'),name:g('#ccName').trim(),feeds:g('#ccKind')==='submain'?g('#ccFeeds'):'',device:g('#ccDev'),curve:g('#ccCurve'),rating:Number(g('#ccRating')),kA:Number(g('#ccKa')),rcdMa:Number(g('#ccMa')),rcdType:g('#ccRt'),afdd:ov.querySelector('#ccAfdd').checked,cable:Number(g('#ccCable')),cpc:Number(g('#ccCpc')),method:g('#ccMethod'),length:g('#ccLen')===''?'':Number(g('#ccLen')),notes:g('#ccNotes')};
+    if(!n.name) n.name=KIND[n.kind]?.label||'Circuit';
+    const cid=id||uid('c'); ov.querySelectorAll('[data-cpt]').forEach(cb=>{ const p=S.points[cb.dataset.cpt]; if(!p) return; const on=cb.checked; if(on&&p.circuitId!==cid){ savePoint(cb.dataset.cpt,{...clone(p),circuitId:cid}); } else if(!on&&p.circuitId===cid){ savePoint(cb.dataset.cpt,{...clone(p),circuitId:''}); } });
+    ov.remove(); store.put('circuits',cid,n); });
+}
+function addTypicalCircuits(bid){
+  const base={boardId:bid,device:'RCBO',curve:'B',kA:6,rcdMa:30,rcdType:'A',afdd:false,method:'B1',length:'',feeds:'',notes:''};
+  const list=[['Lighting','lighting',6,1.5,1.5],['Sockets','ring',32,2.5,1.5],['Kitchen sockets','ring',32,2.5,1.5],['Cooker / hob','cooker',32,6,2.5],['Water heater','water',16,2.5,1.5],['A/C','ac',16,2.5,1.5],['Washing machine & dryer','dedicated',16,2.5,1.5]];
+  const used=circuitList().filter(c=>c.boardId===bid).map(c=>+c.way); let w=1;
+  list.forEach(([name,kind,rating,cable,cpc])=>{ while(used.includes(w)) w++; used.push(w); store.put('circuits',uid('c'),{...base,way:w,name,kind,rating,cable,cpc}); });
+  toast('Added 7 typical circuits. Edit them to match your board.');
+}
+function handleElecClick(t){
+  const bd=t.closest('[data-board]'); if(bd){ UI.board=bd.dataset.board; UI.confirmDel=null; renderElectrical(); return true; }
+  if(t.closest('#addBoard')){ const n=boardList().length; const id=uid('b'); UI.board=id; store.put('boards',id,{name:'DB'+(n+1),role:n?'sub':'main',roomId:'',ways:12,mainSwitch:'',poles:'',ovuv:'',spd:'',enclosure:'',ra:'',supplyA:''}); return true; }
+  if(t.closest('#delBoard')){ const id=UI.board; if(UI.confirmDel===id){ circuitList().filter(c=>c.boardId===id).forEach(c=>{ store.del('circuits',c.id); pointList().filter(p=>p.circuitId===c.id).forEach(p=>{const n=clone(S.points[p.id]); n.circuitId=''; savePoint(p.id,n);}); }); store.del('boards',id); UI.board=null; UI.confirmDel=null; } else { UI.confirmDel=id; renderElectrical(); } return true; }
+  if(t.closest('#placeBoard')){ const b=S.boards[UI.board]; const r=S.rooms[b.roomId]; UI.planLevel=r?r.level:0; UI.tool='db:'+UI.board; UI.planLayers.electrical=true; go('plans'); toast(`Click on the plan where ${b.name} goes.`); return true; }
+  if(t.closest('#addCirc')){ openCircuit(null); return true; }
+  if(t.closest('#tplCirc')){ addTypicalCircuits(UI.board); return true; }
+  const cf=t.closest('[data-chkf]'); if(cf){ UI.chkFilter=cf.dataset.chkf; renderElectrical(); return true; }
+  const ci=t.closest('[data-circ]'); if(ci&&S.circuits[ci.dataset.circ]){ openCircuit(ci.dataset.circ); return true; }
+  return false;
+}
+function handleElecChange(t){
+  const map={bdName:'name',bdRole:'role',bdRoom:'roomId',bdWays:'ways',bdMain:'mainSwitch',bdPoles:'poles',bdOv:'ovuv',bdRa:'ra',bdSupply:'supplyA',bdSpd:'spd',bdEnc:'enclosure'};
+  if(map[t.id]&&UI.board){ const b=clone(S.boards[UI.board]); let v=t.value; if(['ways','mainSwitch','ra','supplyA'].includes(map[t.id])) v=v===''?'':Number(v); if(map[t.id]==='name') v=v.trim()||'DB'; b[map[t.id]]=v; store.put('boards',UI.board,b); return true; }
+  if(t.dataset.assign){ if(!t.value) return true; const p=clone(S.points[t.dataset.assign]); p.circuitId=t.value; savePoint(t.dataset.assign,p); return true; }
+  if(t.id==='ptCirc'){ const p=clone(S.points[UI.planSel]); p.circuitId=t.value; savePoint(UI.planSel,p); return true; }
+  return false;
+}
+
 /* ---------- Routing ---------- */
-const VIEWS=['house','tasks','timeline','plans','dump','budget','setup'];
+const VIEWS=['house','tasks','timeline','plans','electrical','dump','budget','setup'];
 function go(v){ UI.view=v; if(location.hash!=='#'+v) history.replaceState(null,'','#'+v); const a=document.activeElement; a&&a.blur&&a.blur(); deferred=false; $('#main').innerHTML=''; render(); }
 window.addEventListener('hashchange',()=>{ const h=location.hash.slice(1); if(VIEWS.includes(h)&&h!==UI.view) go(h); });
 window.addEventListener('resize',()=>{ if(UI.view==='house'&&UI.dim==='3d'){ UI.zoom=null; build3D(); } });
@@ -1369,6 +1665,8 @@ window.addEventListener('resize',()=>{ if(UI.view==='house'&&UI.dim==='3d'){ UI.
   store.watch('tasks',o=>{S.tasks=o; S.loaded.tasks=true; scheduleRender();});
   store.watch('points',o=>{S.points=o; S.loaded.points=true; scheduleRender();});
   store.watch('items',o=>{S.items=o; scheduleRender();});
+  store.watch('boards',o=>{S.boards=o; scheduleRender();});
+  store.watch('circuits',o=>{S.circuits=o; scheduleRender();});
   store.watchDoc('meta/house',m=>{ if(m) S.meta={...S.meta,...m}; scheduleRender(); });
   window.HUB={S,store,UI};
 })();
