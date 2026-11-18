@@ -277,6 +277,14 @@ textarea{resize:vertical}
 .dbl [data-dev]{cursor:grab}
 .dbl [data-dev].dragging{cursor:grabbing;opacity:.85}
 .devbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+/* Furniture */
+.flib{display:grid;grid-template-columns:1fr;gap:3px;max-height:360px;overflow:auto;padding-right:2px}
+.fitem{display:grid;grid-template-columns:12px 1fr auto;gap:6px;align-items:center;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:4px 6px;font-size:12px;text-align:left}
+.fitem i{width:12px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.3)}
+.fitem .mono{font-size:10px;color:var(--muted)}
+.fitem[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.fb{position:absolute;transform-style:preserve-3d;transform-origin:50% 50%;pointer-events:none}
+.fbt{position:absolute;inset:0;border:1px solid rgba(0,0,0,.35);border-radius:2px}
 /* Budget */
 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
@@ -450,9 +458,9 @@ const eur=n=>n==null||isNaN(n)?'—':new Intl.NumberFormat('en-MT',{style:'curre
 const SCALE=34; // px per metre in the 3D model
 
 /* ---------- State ---------- */
-const S={rooms:{},tasks:{},points:{},items:{},boards:{},circuits:{},meta:{name:'The Townhouse',target:'',daysPerWeek:3,width:0,depth:0,heights:[2.9,2.9,2.4],setupDone:false},loaded:{rooms:false,tasks:false,points:false}};
+const S={rooms:{},tasks:{},points:{},items:{},boards:{},circuits:{},furniture:{},meta:{name:'The Townhouse',target:'',daysPerWeek:3,width:0,depth:0,heights:[2.9,2.9,2.4],setupDone:false},loaded:{rooms:false,tasks:false,points:false}};
 const UI={view:'house',level:'all',layer:'progress',full:false,spin:-32,tilt:52,zoom:null,room:null,roomTab:'tasks',editRoom:null,
-  tf:{sectors:[],room:'',q:''},hiddenCircs:{},planByCirc:true,planHeights:true,lastVariant:{},planLevel:0,tool:'select',planSel:null,planLayers:{walls:true,electrical:true,plumbing:true},
+  tf:{sectors:[],room:'',q:''},hiddenCircs:{},planByCirc:true,planHeights:true,lastVariant:{},planLevel:0,tool:'select',planSel:null,planLayers:{walls:true,electrical:true,plumbing:true,furniture:true},
   dump:{text:'',rows:null,busy:false,summary:''},tl:{proposal:null,busy:false,note:''},advice:{text:'',busy:false},showAllDone:false,
   dim:'3d',setupLevel:0,setupSel:null,csv:{text:'',prune:false,msg:''},bf:{cat:'',q:'',room:''},
   exp:{disc:{arch:true,elec:true,db:true,plumb:true,walls:false},levels:[true,true,true],busy:false}};
@@ -479,7 +487,7 @@ const roomName=id=>S.rooms[id]?.name||'';
 const isOver=t=>t.status!=='done'&&t.due&&t.due<todayISO();
 
 /* ---------- Store (db when available, memory otherwise) ---------- */
-const store={db:null,mem:{rooms:{},tasks:{},points:{},items:{},boards:{},circuits:{},meta:{}},subs:{},queues:{},
+const store={db:null,mem:{rooms:{},tasks:{},points:{},items:{},boards:{},circuits:{},furniture:{},meta:{}},subs:{},queues:{},
   async init(){
     let use=null;
     for(let i=0;i<20&&!use;i++){ if(window.claude&&typeof window.claude.use==='function') use=window.claude.use; else await new Promise(r=>setTimeout(r,100)); }
@@ -581,6 +589,7 @@ function renderHouse(){
           <div class="seg" id="levelSeg" role="group" aria-label="Level"></div>
           <div class="seg" id="layerSeg" role="group" aria-label="Layer"></div>
           <div class="seg" role="group" aria-label="View"><button type="button" id="dim3">3D</button><button type="button" id="dim2">2D plan</button></div>
+          <div class="seg" role="group" aria-label="Furniture"><button type="button" id="furnTog">Furniture</button></div>
           <div class="seg" role="group" aria-label="Walls" id="wallSeg"><button type="button" id="wallLow">Cutaway</button><button type="button" id="wallFull">Full height</button></div>
         </div>
         <div id="stage"><div id="world"></div><div id="plan2d"></div>
@@ -594,7 +603,7 @@ function renderHouse(){
   $('#levelSeg').innerHTML=[['all','All levels'],[0,'Ground'],[1,'First'],[2,'Roof']].map(([k,l])=>`<button type="button" data-level="${k}" aria-pressed="${String(UI.level)===String(k)}">${l}</button>`).join('');
   $('#layerSeg').innerHTML=[['progress','Progress'],['walls','Wall works'],['electrical','Electrical'],['plumbing','Plumbing']].map(([k,l])=>`<button type="button" data-layer="${k}" aria-pressed="${UI.layer===k}">${l}</button>`).join('');
   $('#wallLow').setAttribute('aria-pressed',String(!UI.full)); $('#wallFull').setAttribute('aria-pressed',String(UI.full));
-  $('#dim3').setAttribute('aria-pressed',String(UI.dim==='3d')); $('#dim2').setAttribute('aria-pressed',String(UI.dim==='2d'));
+  $('#furnTog').setAttribute('aria-pressed',String(UI.furn3d!==false)); $('#dim3').setAttribute('aria-pressed',String(UI.dim==='3d')); $('#dim2').setAttribute('aria-pressed',String(UI.dim==='2d'));
   $('#wallSeg').style.display=UI.dim==='2d'?'none':''; $('#stage').classList.toggle('flat',UI.dim==='2d');
   const hint=$('#stage .hint'); if(hint) hint.textContent=UI.dim==='2d'?'Click a room to open it':'Drag to turn · scroll or use + / − to zoom · click a room to open it';
   $('#stage .zoom').style.display=UI.dim==='2d'?'none':'';
@@ -640,7 +649,7 @@ function build3D(){
       let ph='';
       if(showSec.length){ for(const p of pts.filter(p=>p.roomId===r.id&&PT[p.type]&&showSec.includes(PT[p.type].sector))){ const cc=p.circuitId&&S.circuits[p.circuitId]; const c=cc?circColor(cc):SEC[PT[p.type].sector].color; ph+=`<div class="pt3" style="left:${(p.x-r.x)*SCALE}px;top:${(p.y-r.y)*SCALE}px;border-color:${c};${p.done?`background:${c}`:''}"></div>`; } }
       const label=w>44&&d>30?`<span>${esc(r.name)}</span>${pr.pct!=null&&UI.layer==='progress'?`<span class="p">${pr.pct}%</span>`:''}`:'';
-      html+=`<div class="rm" style="left:${x}px;top:${y}px;width:${w}px;height:${d}px"><div class="fl${UI.room===r.id?' sel':''}" data-room="${r.id}" style="background:${floor}" title="${esc(r.name)}">${label}</div>${ph}${wh}</div>`;
+      html+=`<div class="rm" style="left:${x}px;top:${y}px;width:${w}px;height:${d}px"><div class="fl${UI.room===r.id?' sel':''}" data-room="${r.id}" style="background:${floor}" title="${esc(r.name)}">${label}</div>${ph}${UI.furn3d!==false?furn3D(r):''}${wh}</div>`;
     }
     html+='</div>';
   });
@@ -815,19 +824,26 @@ function svgPoint(svg,e){ const pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.
 function bindPlan(){
   const svg=$('#planSvg'); if(!svg) return; let mv=null, pan=null; UI._panned=false;
   svg.addEventListener('wheel',e=>{ e.preventDefault(); const p=svgPoint(svg,e); zoomPlanAt(Math.exp(-e.deltaY*.0015),p.x,p.y); },{passive:false});
-  svg.addEventListener('pointerdown',e=>{ if(e.target.closest('[data-pt]')&&UI.tool==='select') return; const z=UI.pz; if(!z||z.k<=1.001) return; if(UI.tool!=='select'&&!e.shiftKey&&e.button!==1) return;
+  svg.addEventListener('pointerdown',e=>{ if(e.target.closest('[data-pt],[data-furn]')&&UI.tool==='select') return; const z=UI.pz; if(!z||z.k<=1.001) return; if(UI.tool!=='select'&&!e.shiftKey&&e.button!==1) return;
     pan={x:e.clientX,y:e.clientY,cx:z.cx,cy:z.cy,moved:false}; svg.setPointerCapture(e.pointerId); });
   svg.addEventListener('pointermove',e=>{ if(!pan) return; const dx=e.clientX-pan.x, dy=e.clientY-pan.y; if(Math.abs(dx)+Math.abs(dy)>4){ pan.moved=true; svg.classList.add('panning'); }
     if(!pan.moved) return; const ctm=svg.getScreenCTM(); UI.pz.cx=pan.cx-dx/ctm.a; UI.pz.cy=pan.cy-dy/ctm.d; applyPlanZoom(); });
   svg.addEventListener('pointerup',()=>{ if(!pan) return; UI._panned=pan.moved; pan=null; svg.classList.remove('panning'); setTimeout(()=>UI._panned=false,0); });
+  let fm=null;
+  svg.addEventListener('pointerdown',e=>{ const fg=e.target.closest('[data-furn]'); if(!fg||UI.tool!=='select'||e.target.closest('[data-pt]')) return; const s0=svgPoint(svg,e); const f=S.furniture[fg.dataset.furn]; fm={id:fg.dataset.furn,g:fg,sx:s0.x,sy:s0.y,ox:f.x,oy:f.y,moved:false}; svg.setPointerCapture(e.pointerId); e.preventDefault(); });
+  svg.addEventListener('pointermove',e=>{ if(!fm) return; const p=svgPoint(svg,e); const dx=p.x-fm.sx, dy=p.y-fm.sy; if(Math.abs(dx)+Math.abs(dy)<.03&&!fm.moved) return; fm.moved=true; fm.x=Math.round((fm.ox+dx)*20)/20; fm.y=Math.round((fm.oy+dy)*20)/20; const f=S.furniture[fm.id]; fm.g.setAttribute('transform',`translate(${fm.x} ${fm.y}) rotate(${+f.rot||0})`); });
+  svg.addEventListener('pointerup',()=>{ if(!fm) return; const m=fm; fm=null; UI.planSel=null;
+    if(m.moved){ const f=clone(S.furniture[m.id]); const room=roomAt(m.x,m.y,UI.planLevel); f.x=m.x; f.y=m.y; if(room) f.roomId=room.id; UI.furnSel=m.id; store.put('furniture',m.id,snapFurn(f)); }
+    else { UI.furnSel=m.id; renderPlans(); } UI._panned=true; setTimeout(()=>UI._panned=false,0); });
   svg.addEventListener('pointerdown',e=>{ const g=e.target.closest('[data-pt]'); if(g&&UI.tool==='select'){ const s0=svgPoint(svg,e); const pt=S.points[g.dataset.pt]; mv={id:g.dataset.pt,moved:false,sx:s0.x,sy:s0.y,ox:pt.x,oy:pt.y}; svg.setPointerCapture(e.pointerId); e.preventDefault(); } });
   svg.addEventListener('pointermove',e=>{ if(!mv) return; const p=svgPoint(svg,e); const dx=p.x-mv.sx, dy=p.y-mv.sy; if(Math.abs(dx)+Math.abs(dy)<.04&&!mv.moved) return; mv.moved=true; mv.x=Math.round((mv.ox+dx)*20)/20; mv.y=Math.round((mv.oy+dy)*20)/20; const g=svg.querySelector(`[data-pt="${mv.id}"]`); const s=planPtScale(); if(g) g.setAttribute('transform',`translate(${(mv.x-mv.ox)/s} ${(mv.y-mv.oy)/s})`); });
   svg.addEventListener('pointerup',e=>{ if(!mv) return; const m=mv; mv=null;
     if(m.moved){ const room=roomAt(m.x,m.y,UI.planLevel); const p=clone(S.points[m.id]); if(room){p.x=m.x;p.y=m.y;p.roomId=room.id;} UI.planSel=m.id; savePoint(m.id,p); }
-    else { UI.planSel=m.id; renderPlans(); } });
-  svg.addEventListener('click',e=>{ if(UI._panned) return; if(UI.tool==='select'){ if(!e.target.closest('[data-pt]')&&UI.planSel){UI.planSel=null;renderPlans();} return; }
+    else { UI.planSel=m.id; UI.furnSel=null; renderPlans(); } });
+  svg.addEventListener('click',e=>{ if(UI._panned) return; if(UI.tool==='select'){ if(!e.target.closest('[data-pt],[data-furn]')&&(UI.planSel||UI.furnSel)){UI.planSel=null;UI.furnSel=null;renderPlans();} return; }
     const p=svgPoint(svg,e); const x=Math.round(p.x*20)/20, y=Math.round(p.y*20)/20; const room=roomAt(x,y,UI.planLevel);
     if(!room){ toast('Click inside a room to place the point.'); return; }
+    if(UI.tool==='furn'){ const k=FK[UI.furnKind]; if(!k){ toast('Pick an item from the furniture library first.'); return; } const id=uid('f'); const f={kind:k.k,label:'',w:k.w,d:k.d,h:k.h,elev:k.elev||0,rot:autoRot(x,y,room),x,y,roomId:room.id,created:Date.now()}; UI.furnSel=id; UI.planSel=null; store.put('furniture',id,snapFurn(f)); return; }
     if(UI.tool.startsWith('db:')){ const bid=UI.tool.slice(3); const b=clone(S.boards[bid]); if(b){ b.x=x; b.y=y; b.roomId=room.id; UI.tool='select'; store.put('boards',bid,b); toast(`${b.name} placed in ${room.name}.`); } return; }
     const id=uid('p'); UI.planSel=id; const vk=(UI.lastVariant||{})[UI.tool]; const vs=VARIANTS[UI.tool]||[]; const v=vs.find(q=>q.k===vk)||vs[0];
     savePoint(id,{type:UI.tool,variant:v?v.k:'',height:v?defaultHeight(v,room):'',roomId:room.id,x,y,label:'',done:false,created:Date.now()}); });
@@ -978,6 +994,7 @@ document.addEventListener('click',e=>{
   const ly=t.closest('[data-layer]'); if(ly){ UI.layer=ly.dataset.layer; renderHouse(); return; }
   if(t.closest('#wallLow')){ UI.full=false; renderHouse(); return; }
   if(t.closest('#wallFull')){ UI.full=true; renderHouse(); return; }
+  if(t.closest('#furnTog')){ UI.furn3d=UI.furn3d===false; renderHouse(); return; }
   if(t.closest('#dim3')){ UI.dim='3d'; UI.zoom=null; renderHouse(); return; }
   if(t.closest('#dim2')){ UI.dim='2d'; renderHouse(); return; }
   if(t.closest('#railBack')){ if(UI.editRoom&&UI.editRoom!=='new'){UI.editRoom=null;} else {UI.editRoom=null; UI.room=null;} renderHouse(); return; }
@@ -1002,7 +1019,7 @@ document.addEventListener('click',e=>{
   if(t.closest('#tlDiscard')){ UI.tl.proposal=null; UI.tl.note=''; renderTimeline(); return; }
   // plans
   const pl=t.closest('[data-plevel]'); if(pl){ UI.planLevel=Number(pl.dataset.plevel); UI.planSel=null; renderPlans(); return; }
-  const tl=t.closest('[data-tool]'); if(tl){ UI.tool=tl.dataset.tool; UI.planSel=null; renderPlans(); return; }
+  const tl=t.closest('[data-tool]'); if(tl){ UI.tool=tl.dataset.tool; UI.planSel=null; UI.furnSel=null; renderPlans(); return; }
   const ps=t.closest('[data-ptsel]'); if(ps){ UI.planSel=ps.dataset.ptsel; renderPlans(); return; }
   if(t.closest('#ptClose')){ UI.planSel=null; renderPlans(); return; }
   if(t.closest('#ptDel')){ const id=UI.planSel; UI.planSel=null; store.del('points',id); return; }
@@ -1087,6 +1104,7 @@ function planG(lv,o={}){
      <text x="${b.x0+W/2}" y="${b.y0-.82}" text-anchor="middle" stroke="none">${W.toFixed(2)} m · street</text>
      <line x1="${b.x0-.7}" y1="${b.y0}" x2="${b.x0-.7}" y2="${b.y1}"/><line x1="${b.x0-.85}" y1="${b.y0}" x2="${b.x0-.55}" y2="${b.y0}"/><line x1="${b.x0-.85}" y1="${b.y1}" x2="${b.x0-.55}" y2="${b.y1}"/>
      <text x="${b.x0-.82}" y="${b.y0+D/2}" text-anchor="middle" stroke="none" transform="rotate(-90 ${b.x0-.82} ${b.y0+D/2})">${D.toFixed(2)} m</text></g>`; }
+  if(o.furn) g+=furnG(lv,{click:o.furnClick,fsel:o.fsel});
   if(o.pts&&o.pts.length){
     const list=pointList().filter(p=>{ const ty=PT[p.type], r=S.rooms[p.roomId]; if(!ty||!r||r.level!==lv||!o.pts.includes(ty.sector)) return false;
       if(o.filterCirc&&['electrical','lighting'].includes(ty.sector)){ const key=p.circuitId&&S.circuits[p.circuitId]?p.circuitId:'none'; if(UI.hiddenCircs[key]) return false; } return true; });
@@ -1113,7 +1131,7 @@ function build2D(){
   const levels=UI.level==='all'?[0,1,2]:[Number(UI.level)];
   const pts=UI.layer==='electrical'?['electrical','lighting']:UI.layer==='plumbing'?['plumbing']:[];
   let g=''; levels.forEach((lv,i)=>{ const dx=i*(W+gap);
-    g+=`<g transform="translate(${dx} 0)"><text x="${b.x0+W/2}" y="${b.y0-.45}" text-anchor="middle" font-family="Bricolage Grotesque, Arial Narrow, sans-serif" font-weight="700" font-size=".34" letter-spacing=".04" fill="var(--muted)">${LEVELS[lv].toUpperCase()}</text>${planG(lv,{fill:UI.layer==='progress'?'progress':'plain',walls:UI.layer==='walls',pts,click:'room2',sel:UI.room})}</g>`; });
+    g+=`<g transform="translate(${dx} 0)"><text x="${b.x0+W/2}" y="${b.y0-.45}" text-anchor="middle" font-family="Bricolage Grotesque, Arial Narrow, sans-serif" font-weight="700" font-size=".34" letter-spacing=".04" fill="var(--muted)">${LEVELS[lv].toUpperCase()}</text>${planG(lv,{fill:UI.layer==='progress'?'progress':'plain',walls:UI.layer==='walls',pts,click:'room2',sel:UI.room,furn:UI.furn3d!==false,furnClick:false})}</g>`; });
   const vb=[b.x0-.4,b.y0-1,levels.length*W+(levels.length-1)*gap+.8,D+1.4];
   box.innerHTML=`<svg viewBox="${vb.join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Floor plans">${g}</svg>`;
 }
@@ -1124,19 +1142,21 @@ function renderPlans(){
   const vb=[b.x0-pad,b.y0-pad,(b.x1-b.x0)+pad*2,(b.y1-b.y0)+pad*2];
   const pts=pointList().filter(p=>{const r=S.rooms[p.roomId]; return r&&r.level===lv&&PT[p.type];});
   const sec=[...(UI.planLayers.electrical?['electrical','lighting']:[]),...(UI.planLayers.plumbing?['plumbing']:[])];
-  const svg=planG(lv,{fill:'plain',walls:UI.planLayers.walls,pts:sec,dims:true,ptsel:UI.planSel,filterCirc:true,byCirc:UI.planByCirc!==false,heights:UI.planHeights!==false,ptScale:planPtScale()});
+  const svg=planG(lv,{fill:'plain',walls:UI.planLayers.walls,pts:sec,dims:true,ptsel:UI.planSel,filterCirc:true,byCirc:UI.planByCirc!==false,heights:UI.planHeights!==false,ptScale:planPtScale(),furn:UI.planLayers.furniture,furnClick:UI.tool==='select',fsel:UI.furnSel});
   const selP=UI.planSel&&S.points[UI.planSel]?{id:UI.planSel,...S.points[UI.planSel]}:null;
   const counts=s=>{const l=pts.filter(p=>s.includes(PT[p.type].sector));return `${l.filter(p=>p.done).length}/${l.length}`};
   const H3=t=>`<h3 style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">${t}</h3>`;
   $('#main').innerHTML=`<section class="plans">
    <aside>
      <div>${H3('Level')}<div class="seg">${LEVELS.map((l,i)=>`<button type="button" data-plevel="${i}" aria-pressed="${lv===i}">${l.split(' ')[0]}</button>`).join('')}</div></div>
-     <div>${H3('Show')}${[['walls','Wall works'],['electrical','Electrical & lighting'],['plumbing','Plumbing & gas']].map(([k,l])=>`<label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:2px 0"><input type="checkbox" data-player="${k}" ${UI.planLayers[k]?'checked':''}>${l}</label>`).join('')}
+     <div>${H3('Show')}${[['furniture','Furniture'],['walls','Wall works'],['electrical','Electrical & lighting'],['plumbing','Plumbing & gas']].map(([k,l])=>`<label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:2px 0"><input type="checkbox" data-player="${k}" ${UI.planLayers[k]?'checked':''}>${l}</label>`).join('')}
        <label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:2px 0"><input type="checkbox" id="plByCirc" ${UI.planByCirc!==false?'checked':''}>Colour points by circuit</label>
        <label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:2px 0"><input type="checkbox" id="plHeights" ${UI.planHeights!==false?'checked':''}>Show mounting heights</label></div>
      ${UI.planLayers.electrical?circuitFilterHTML(lv):''}
      <div>${H3('Place a point')}<div class="tools"><button type="button" data-tool="select" aria-pressed="${UI.tool==='select'}" class="wide"><span class="glyph" style="--c:var(--muted)">↖</span>Select / move</button>
-     ${[['Power & data',['socket','switch','data','ac','fan','alarm','cu']],['Lighting',['light']],['Plumbing & gas',['cold','hot','waste','gas']]].map(([h,keys])=>`<div class="tool-h">${h}</div>`+PTYPES.filter(p=>keys.includes(p.key)&&(p.key!=='cu'||pointList().some(q=>q.type==='cu'))).map(p=>`<button type="button" data-tool="${p.key}" aria-pressed="${UI.tool===p.key}" title="${esc(p.label)}"><span class="glyph" style="--c:${SEC[p.sector].color}">${p.g}</span>${esc(p.label.replace(' / CO alarm','').replace('Smoke / heat','Alarm'))}</button>`).join('')).join('')}</div></div>
+     ${[['Power & data',['socket','switch','data','ac','fan','alarm','cu']],['Lighting',['light']],['Plumbing & gas',['cold','hot','waste','gas']]].map(([h,keys])=>`<div class="tool-h">${h}</div>`+PTYPES.filter(p=>keys.includes(p.key)&&(p.key!=='cu'||pointList().some(q=>q.type==='cu'))).map(p=>`<button type="button" data-tool="${p.key}" aria-pressed="${UI.tool===p.key}" title="${esc(p.label)}"><span class="glyph" style="--c:${SEC[p.sector].color}">${p.g}</span>${esc(p.label.replace(' / CO alarm','').replace('Smoke / heat','Alarm'))}</button>`).join('')).join('')}
+     <div class="tool-h">Furniture & fittings</div><button type="button" class="wide" data-tool="furn" aria-pressed="${UI.tool==='furn'}"><span class="glyph" style="--c:#b07a3c">▭</span>Furniture library…</button></div>
+     ${UI.tool==='furn'?furnLibrary():''}</div>
      <div class="export">${H3('Export PDF drawings')}
        ${[['arch','Architectural'],['elec','Electrical & lighting'],['db','Distribution board schedules'],['plumb','Plumbing & gas'],['walls','Wall works']].map(([k,l])=>`<label><input type="checkbox" data-expd="${k}" ${UI.exp.disc[k]?'checked':''}>${l}</label>`).join('')}
        <div class="muted" style="font-size:11.5px;margin-top:4px">Levels</div>
@@ -1147,7 +1167,7 @@ function renderPlans(){
    <div class="plan-stage" id="planStage"><svg id="planSvg" class="${UI.tool!=='select'?'placing':''}" data-vb="${vb.join(' ')}" viewBox="${planViewBox(vb).join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${LEVELS[lv]} plan">${svg}</svg>
      <div class="plan-tools"><button type="button" id="pzIn" title="Zoom in" aria-label="Zoom in">+</button><button type="button" id="pzOut" title="Zoom out" aria-label="Zoom out">−</button><button type="button" id="pzFit" title="Fit plan" aria-label="Fit plan">⤢</button><span class="zl" id="pzLabel">${Math.round((UI.pz?.k||1)*100)}%</span><button type="button" id="pzUndo" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">↶</button></div></div>
    <aside class="right">
-     ${selP?`<div style="display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px"><div style="display:flex;gap:8px;align-items:center"><span class="glyph" style="--c:${SEC[PT[selP.type].sector].color}">${esc(ptGlyph(selP))}</span><b>${esc(ptLabel(selP))}</b><span class="muted">· ${esc(roomName(selP.roomId))}</span></div>
+     ${UI.furnSel&&S.furniture[UI.furnSel]?furnEditor({id:UI.furnSel,...S.furniture[UI.furnSel]}):selP?`<div style="display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px"><div style="display:flex;gap:8px;align-items:center"><span class="glyph" style="--c:${SEC[PT[selP.type].sector].color}">${esc(ptGlyph(selP))}</span><b>${esc(ptLabel(selP))}</b><span class="muted">· ${esc(roomName(selP.roomId))}</span></div>
        ${(VARIANTS[selP.type]||[]).length?`<label class="f" for="ptVar">Type<select id="ptVar">${VARIANTS[selP.type].map(v=>`<option value="${v.k}" ${selP.variant===v.k?'selected':''}>${esc(v.l)}</option>`).join('')}</select></label>`:''}
        <label class="f" for="ptH">Height above finished floor (mm)<input id="ptH" type="number" min="0" step="10" value="${esc(selP.height??'')}" placeholder="e.g. 450"></label>
        <div style="display:flex;gap:4px;flex-wrap:wrap">${[150,300,450,1100,1200,1800,2100].map(h=>`<button type="button" class="btn small" data-ph="${h}">${h}</button>`).join('')}<button type="button" class="btn small" data-ph="ceil">Ceiling</button></div>
@@ -1157,7 +1177,7 @@ function renderPlans(){
        ${['electrical','lighting'].includes(PT[selP.type].sector)&&selP.type!=='light'?`<label class="f" for="ptCirc">Circuit<select id="ptCirc"><option value="">Not assigned</option>${circuitList().filter(c=>c.kind!=='submain').map(c=>`<option value="${c.id}" ${selP.circuitId===c.id?'selected':''}>${esc(cref(c))} ${esc(c.name||'')}</option>`).join('')}</select></label>${circuitList().length?'':'<span class="muted" style="font-size:12px">Add circuits on the Electrical page first.</span>'}`:''}
        <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="ptDone" ${selP.done?'checked':''}> Installed / done</label>
        <div style="display:flex;justify-content:space-between"><button class="btn small" type="button" id="ptClose">Close</button><button class="btn small danger" type="button" id="ptDel">Delete point</button></div></div>`:
-       `<p class="muted" style="font-size:12.5px;margin:0">${UI.tool.startsWith('db:')?'Click inside a room to place '+esc(S.boards[UI.tool.slice(3)]?.name||'the board')+'.':UI.tool==='select'?'Pick a point type on the left, then click inside a room to place it. Click a point to edit it, or drag it to move it.':'Click inside a room to place a '+PT[UI.tool].label.toLowerCase()+'.'}</p>`}
+       `<p class="muted" style="font-size:12.5px;margin:0">${UI.tool==='furn'?(UI.furnKind?'Click in a room to place: '+esc(FK[UI.furnKind]?.l||''):'Pick an item from the furniture library.'):UI.tool.startsWith('db:')?'Click inside a room to place '+esc(S.boards[UI.tool.slice(3)]?.name||'the board')+'.':UI.tool==='select'?'Pick a point type on the left, then click inside a room to place it. Click a point to edit it, or drag it to move it.':'Click inside a room to place a '+PT[UI.tool].label.toLowerCase()+'.'}</p>`}
      <div>${H3(LEVELS[lv])}<div class="muted num" style="font-size:12.5px">Electrical & lighting done ${counts(['electrical','lighting'])} · Plumbing done ${counts(['plumbing'])}</div></div>
      <div class="pt-list">${rs.map(r=>{const l=pts.filter(p=>p.roomId===r.id);if(!l.length)return'';return `<div class="muted" style="font:600 11px var(--body);letter-spacing:.06em;text-transform:uppercase;margin-top:6px">${esc(r.name)}</div>`+l.map(p=>{const ty=PT[p.type];const cc=p.circuitId&&S.circuits[p.circuitId]; const col=cc?circColor(cc):SEC[ty.sector].color; return `<div class="pt-row${UI.planSel===p.id?' sel':''}" data-ptsel="${p.id}"><span class="glyph" style="--c:${col};${p.done?`background:${col};color:#fff`:''}">${esc(ptGlyph(p))}</span><span style="flex:1">${esc(p.label||ptLabel(p))}</span><span class="muted mono" style="font-size:10.5px">${p.height!=null&&p.height!==''?esc(heightLabel(p)):''}${cc?' '+esc(cref(cc)):''}</span></div>`}).join('')}).join('')||'<div class="empty">No points on this level yet.</div>'}</div>
      ${UI.planLayers.walls?`<div>${H3('Wall colours')}${STAGES.map(s=>`<div style="display:flex;gap:6px;align-items:center;font-size:12.5px"><i style="width:18px;height:4px;background:${s.color};display:inline-block"></i>Needs ${s.label.toLowerCase()}</div>`).join('')}<div style="display:flex;gap:6px;align-items:center;font-size:12.5px"><i style="width:18px;height:4px;background:var(--good);display:inline-block"></i>Finished</div></div>`:''}
@@ -1169,6 +1189,7 @@ function renderPlans(){
 function moveRoom(id,patch){
   const r=clone(S.rooms[id]); const dx=(patch.x!=null?patch.x:r.x)-r.x, dy=(patch.y!=null?patch.y:r.y)-r.y;
   Object.assign(r,patch); saveRoom(id,r);
+  if((dx||dy)&&patch.level==null) furnList().filter(f=>f.roomId===id).forEach(f=>{ const n=clone(S.furniture[f.id]); n.x=Math.round((n.x+dx)*100)/100; n.y=Math.round((n.y+dy)*100)/100; store.put('furniture',f.id,n); });
   if((dx||dy)&&patch.level==null) pointList().filter(p=>p.roomId===id).forEach(p=>{ const n=clone(S.points[p.id]); n.x=Math.round((n.x+dx)*100)/100; n.y=Math.round((n.y+dy)*100)/100; savePoint(p.id,n); });
 }
 function setupWarnings(lv){
@@ -1289,12 +1310,12 @@ function importCSV(){
   if(UI.csv.prune){ for(const r of existing){ if(!seen.has(key(r.level,r.name))){ deleteRoom(r.id); del++; } } }
   UI.csv.msg=`Imported: ${up} updated, ${add} added${UI.csv.prune?`, ${del} removed`:''}.${errors.length?' Skipped: '+errors.join(' '):''}`; UI.csv.err=!!errors.length;
 }
-function backupJSON(){ return JSON.stringify({app:'house-hub',version:1,exported:new Date().toISOString(),meta:S.meta,rooms:S.rooms,tasks:S.tasks,points:S.points,items:S.items,boards:S.boards,circuits:S.circuits},null,2); }
+function backupJSON(){ return JSON.stringify({app:'house-hub',version:1,exported:new Date().toISOString(),meta:S.meta,rooms:S.rooms,tasks:S.tasks,points:S.points,items:S.items,boards:S.boards,circuits:S.circuits,furniture:S.furniture},null,2); }
 function restoreBackup(d){
-  for(const col of ['rooms','tasks','points','items','boards','circuits']){ if(!d[col]&&(col==='boards'||col==='circuits')) continue; const keep=d[col]||{}; for(const id of Object.keys(S[col])) if(!keep[id]) store.del(col,id); for(const [id,v] of Object.entries(keep)) store.put(col,id,v); }
+  for(const col of ['rooms','tasks','points','items','boards','circuits','furniture']){ if(!d[col]&&['boards','circuits','furniture'].includes(col)) continue; const keep=d[col]||{}; for(const id of Object.keys(S[col])) if(!keep[id]) store.del(col,id); for(const [id,v] of Object.entries(keep)) store.put(col,id,v); }
   if(d.meta) store.put('meta','house',{...d.meta});
 }
-function deleteRoom(id){ store.del('rooms',id); boardList().filter(b=>b.roomId===id).forEach(b=>{const n=clone(S.boards[b.id]); n.roomId=''; delete n.x; delete n.y; store.put('boards',b.id,n);}); taskList().filter(x=>x.roomId===id).forEach(x=>{const n=clone(S.tasks[x.id]); n.roomId=''; saveTask(x.id,n);}); pointList().filter(p=>p.roomId===id).forEach(p=>store.del('points',p.id)); itemList().filter(x=>x.roomId===id).forEach(x=>{const n=clone(S.items[x.id]); n.roomId=''; store.put('items',x.id,n);}); }
+function deleteRoom(id){ store.del('rooms',id); furnList().filter(f=>f.roomId===id).forEach(f=>store.del('furniture',f.id)); boardList().filter(b=>b.roomId===id).forEach(b=>{const n=clone(S.boards[b.id]); n.roomId=''; delete n.x; delete n.y; store.put('boards',b.id,n);}); taskList().filter(x=>x.roomId===id).forEach(x=>{const n=clone(S.tasks[x.id]); n.roomId=''; saveTask(x.id,n);}); pointList().filter(p=>p.roomId===id).forEach(p=>store.del('points',p.id)); itemList().filter(x=>x.roomId===id).forEach(x=>{const n=clone(S.items[x.id]); n.roomId=''; store.put('items',x.id,n);}); }
 
 /* ---------- Budget ---------- */
 function unitPrice(it){ const qs=(it.quotes||[]).filter(q=>q.price!==''&&q.price!=null&&!isNaN(+q.price)); const ch=qs.find(q=>q.id===it.chosen); if(ch) return +ch.price; if(qs.length) return Math.min(...qs.map(q=>+q.price)); return it.estimate!==''&&it.estimate!=null&&!isNaN(+it.estimate)?+it.estimate:null; }
@@ -1436,6 +1457,9 @@ async function buildPDF(discs,lvls){
       if(op.type==='door'){ L(X(q.hinge[0]),Y(q.hinge[1]),X(q.leaf[0]),Y(q.leaf[1]),1,ink); for(let i=0;i<q.arc.length-1;i++) L(X(q.arc[i][0]),Y(q.arc[i][1]),X(q.arc[i+1][0]),Y(q.arc[i+1][1]),.4,grey); }
       else if(op.type==='window'){ for(const f of [-.07,0,.07]) L(X(q.p0[0]+q.n[0]*f),Y(q.p0[1]+q.n[1]*f),X(q.p1[0]+q.n[0]*f),Y(q.p1[1]+q.n[1]*f),.5,ink); }
       if(disc==='arch'){ const mx=(q.p0[0]+q.p1[0])/2+q.n[0]*.35, my=(q.p0[1]+q.p1[1])/2+q.n[1]*.35; T(`${op.type==='door'?'D':op.type==='window'?'W':'O'} ${(+q.w).toFixed(2)}`,X(mx),Y(my)-2,{size:5.5,align:'center',color:grey}); } }
+    if(disc==='arch'||disc==='elec'||disc==='plumb'){ for(const f of furnList().filter(f=>rs.some(r=>r.id===f.roomId))){ const a=(+f.rot||0)*Math.PI/180, hw=f.w/2000, hd=f.d/2000; const cs=Math.cos(a), sn=Math.sin(a); const c=[[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]].map(([u,v])=>[f.x+u*cs-v*sn,f.y+u*sn+v*cs]);
+      for(let i=0;i<4;i++){ const p1=c[i], p2=c[(i+1)%4]; L(X(p1[0]),Y(p1[1]),X(p2[0]),Y(p2[1]),.5,grey,+f.elev>0?[2,2]:undefined); }
+      if(disc==='arch'&&hw*2*k>34&&hd*2*k>14) T((f.label||FK[f.kind]?.l||'').replace(/ \(.*\)$/,'').slice(0,20),X(f.x),Y(f.y)-2,{size:5,align:'center',color:grey}); } }
     // labels
     for(const r of rs){ const cx=X(r.x+r.w/2), cy=disc==='elec'||disc==='plumb'?Y(r.y)-Math.min(20,r.d*k/3):Y(r.y+r.d/2); let sz=Math.min(9,r.w*k/9); const nw=FB.widthOfTextAtSize(pdfSafe(r.name),1); sz=Math.max(4.5,Math.min(sz<5.5?5.5:sz,(r.w*k-6)/nw));
       T(r.name,cx,cy+2,{bold:true,size:sz,align:'center'});
@@ -1485,6 +1509,7 @@ async function buildPDF(discs,lvls){
 
 /* ---------- Extra event handlers ---------- */
 function handleExtraClick(t,e){
+  if(handleFurnClick(t)) return true;
   if(t.closest('#pzIn')){ zoomPlanAt(1.4); return true; }
   if(t.closest('#pzOut')){ zoomPlanAt(1/1.4); return true; }
   if(t.closest('#pzFit')){ UI.pz={k:1,lv:UI.planLevel}; applyPlanZoom(); return true; }
@@ -1514,6 +1539,7 @@ function handleExtraClick(t,e){
   return false;
 }
 function handleExtraChange(t){
+  if(handleFurnChange(t)) return true;
   if(t.id==='plByCirc'){ UI.planByCirc=t.checked; renderPlans(); return true; }
   if(t.id==='plHeights'){ UI.planHeights=t.checked; renderPlans(); return true; }
   if(t.dataset.circvis){ if(t.checked) delete UI.hiddenCircs[t.dataset.circvis]; else UI.hiddenCircs[t.dataset.circvis]=true; if(UI.planSel&&S.points[UI.planSel]&&(S.points[UI.planSel].circuitId||'none')===t.dataset.circvis&&!t.checked) UI.planSel=null; renderPlans(); return true; }
@@ -1893,6 +1919,95 @@ function handleElecChange(t){
   return false;
 }
 
+/* ---------- Furniture ---------- */
+// Standard sizes in mm (width × depth × height). elev = height of the underside off the floor. UK/EU common sizes; beds use mattress sizes.
+const FCATS=[
+ {key:'kitchen',label:'Kitchen units',fill:'#d9b48f'},{key:'appl',label:'Appliances',fill:'#b9c7d1'},{key:'bath',label:'Bathroom',fill:'#9fd3df'},
+ {key:'bed',label:'Bedroom',fill:'#d7b8e4'},{key:'living',label:'Living & dining',fill:'#f3c48c'},{key:'store',label:'Storage & shelving',fill:'#cbc49a'},
+ {key:'roof',label:'Roof, yard & utility',fill:'#a9d6a3'}];
+const FCAT=Object.fromEntries(FCATS.map(c=>[c.key,c]));
+const FURN=[
+ ['kitchen','base300','Base unit 300',300,600,900],['kitchen','base400','Base unit 400',400,600,900],['kitchen','base500','Base unit 500',500,600,900],['kitchen','base600','Base unit 600',600,600,900],
+ ['kitchen','base800','Base unit 800',800,600,900],['kitchen','base1000','Base unit 1000',1000,600,900],['kitchen','sink1000','Sink base unit 1000',1000,600,900],['kitchen','corner','Corner base unit 1000',1000,600,900],
+ ['kitchen','drawer600','Drawer pack 600',600,600,900],['kitchen','tall600','Tall unit 600 (oven/larder)',600,600,2100],['kitchen','wall300','Wall unit 300',300,350,720,1450],['kitchen','wall600','Wall unit 600',600,350,720,1450],
+ ['kitchen','wall1000','Wall unit 1000',1000,350,720,1450],['kitchen','worktop','Worktop 40 mm (set length)',3000,600,40,860],['kitchen','island','Kitchen island',1800,900,900],['kitchen','bar','Breakfast bar',1500,450,1050],
+ ['appl','ff','Fridge freezer',600,650,1850],['appl','amfridge','American fridge freezer',910,720,1780],['appl','dw','Dishwasher',600,600,850],['appl','dwslim','Slimline dishwasher',450,600,850],
+ ['appl','wm','Washing machine',600,600,850],['appl','td','Tumble dryer',600,600,850],['appl','range','Range cooker 900',900,600,900],['appl','hob','Hob 600 (on worktop)',600,520,50,900],
+ ['appl','oven','Built-in oven',600,560,600,800],['appl','hood','Cooker hood 600',600,500,150,1650],['appl','mw','Microwave',500,400,300,1400],['appl','wh80','Water heater 80 L',450,450,800,1600,'round'],
+ ['bath','wc','Toilet (close-coupled)',380,650,800,0,'wc'],['bath','wcwall','Wall-hung toilet',360,520,400,0,'wc'],['bath','bidet','Bidet',360,550,400,0,'wc'],['bath','basin','Basin on pedestal',550,450,850,0,'round'],
+ ['bath','vanity600','Vanity unit 600',600,450,850],['bath','vanity800','Vanity unit 800',800,450,850],['bath','tray900','Shower tray 900 × 900',900,900,40],['bath','tray1200','Shower tray 1200 × 800',1200,800,40],
+ ['bath','tray1400','Walk-in tray 1400 × 900',1400,900,40],['bath','bath','Bath 1700 × 700',1700,700,550],['bath','towel','Towel radiator',500,100,1200,150],['bath','mirror','Mirror cabinet',600,150,700,1300],
+ ['bed','single','Single bed (90 × 190)',900,1900,450],['bed','small','Small double (120 × 190)',1200,1900,450],['bed','double','Double bed (135 × 190)',1350,1900,450],['bed','eudouble','Double bed EU (140 × 200)',1400,2000,450],
+ ['bed','queen','Queen bed EU (160 × 200)',1600,2000,450],['bed','king','King bed (150 × 200)',1500,2000,450],['bed','superking','Super king (180 × 200)',1800,2000,450],['bed','cot','Cot',700,1300,900],
+ ['bed','bedside','Bedside table',450,400,550],['bed','ward2','Wardrobe 2-door',1000,600,2000],['bed','ward3','Wardrobe 3-door',1500,600,2000],['bed','wardslide','Sliding wardrobe',1800,650,2200],
+ ['bed','chest','Chest of drawers',800,450,850],['bed','dresser','Dressing table',1000,450,750],['bed','desk','Desk',1200,600,750],
+ ['living','sofa2','Sofa 2-seat',1600,900,850],['living','sofa3','Sofa 3-seat',2100,900,850],['living','corner','Corner sofa',2600,1700,850],['living','arm','Armchair',850,850,850],
+ ['living','coffee','Coffee table',1100,600,450],['living','tvunit','TV unit',1800,400,500],['living','tv55','TV 55" (wall)',1230,60,710,1000],['living','dine4','Dining table 4-seat',1200,800,750],
+ ['living','dine6','Dining table 6-seat',1800,900,750],['living','dine8','Dining table 8-seat',2200,1000,750],['living','round4','Round table 4-seat',1000,1000,750,0,'round'],['living','chair','Dining chair',450,500,900],
+ ['living','sideboard','Sideboard',1600,450,800],
+ ['store','bookcase','Bookcase',800,300,1800],['store','shelf','Wall shelf',1000,250,30,1500],['store','shoe','Shoe cabinet',800,350,1000],['store','console','Console table',1000,350,800],['store','tallcup','Tall cupboard',600,450,2000],
+ ['roof','tank1000','Water tank 1000 L',1100,1100,1150,0,'round'],['roof','tank500','Water tank 500 L',900,900,950,0,'round'],['roof','solar','Solar water heater',2100,1100,1300],['roof','pv','PV panel',1720,1130,40,300],
+ ['roof','acout','A/C outdoor unit',800,300,550],['roof','usink','Utility sink',600,500,850],['roof','otable','Outdoor table',1600,900,750],['roof','lounger','Sun lounger',2000,700,350],
+ ['roof','bbq','BBQ',1200,600,1000],['roof','planter','Planter',1000,400,400],['roof','line','Clothes line (rotary)',2000,2000,1800,0,'round'],
+ ['store','custom','Custom box',1000,600,900]
+].map(([cat,k,l,w,d,h,elev=0,shape='rect'])=>({cat,k,l,w,d,h,elev,shape}));
+const FK=Object.fromEntries(FURN.map(f=>[f.k,f]));
+const furnList=()=>Object.entries(S.furniture).map(([id,f])=>({id,...f}));
+const fFill=f=>FCAT[(FK[f.kind]||{}).cat||'store']?.fill||'#ccc';
+function fHalf(f){ const w=f.w/2000, d=f.d/2000; return ((+f.rot||0)%180)?[d,w]:[w,d]; }
+function snapFurn(f){ const r=roomAt(f.x,f.y,S.rooms[f.roomId]?.level??UI.planLevel)||S.rooms[f.roomId]; if(!r) return f; const [hx,hy]=fHalf(f); const T=.14, gap=.07;
+  if(Math.abs(f.x-hx-r.x)<T+gap) f.x=r.x+gap+hx; else if(Math.abs(r.x+r.w-(f.x+hx))<T+gap) f.x=r.x+r.w-gap-hx;
+  if(Math.abs(f.y-hy-r.y)<T+gap) f.y=r.y+gap+hy; else if(Math.abs(r.y+r.d-(f.y+hy))<T+gap) f.y=r.y+r.d-gap-hy;
+  if(2*hx<=r.w-2*gap) f.x=Math.max(r.x+gap+hx,Math.min(r.x+r.w-gap-hx,f.x)); if(2*hy<=r.d-2*gap) f.y=Math.max(r.y+gap+hy,Math.min(r.y+r.d-gap-hy,f.y));
+  f.x=Math.round(f.x*100)/100; f.y=Math.round(f.y*100)/100; return f; }
+function autoRot(x,y,room,def){ const dl=x-room.x, dr=room.x+room.w-x, dt=y-room.y, db=room.y+room.d-y; const m=Math.min(dl,dr,dt,db); return m===dt?0:m===db?180:m===dl?270:90; }
+function furnG(lv,o){
+  let g=''; for(const f of furnList()){ const r=S.rooms[f.roomId]; if(!r||r.level!==lv) continue; const w=f.w/1000, d=f.d/1000; const sel=o.fsel===f.id; const k=FK[f.kind]||{};
+    const rx=k.shape==='round'?Math.min(w,d)/2:k.shape==='wc'?Math.min(w,d)*.35:.03;
+    g+=`<g data-furn="${f.id}" transform="translate(${f.x} ${f.y}) rotate(${+f.rot||0})" ${o.click?'style="cursor:move"':'pointer-events="none"'}>
+      <rect x="${-w/2}" y="${-d/2}" width="${w}" height="${d}" rx="${rx}" fill="${fFill(f)}" fill-opacity="${+f.elev>0?.35:.7}" stroke="${sel?'var(--accent)':'var(--ink)'}" stroke-width="${sel?.05:.018}" ${+f.elev>0?'stroke-dasharray=".08 .05"':''}/>
+      ${k.shape!=='round'?`<line x1="${-w/2+.04}" y1="${d/2-.05}" x2="${w/2-.04}" y2="${d/2-.05}" stroke="var(--ink)" stroke-width=".012" opacity=".5"/>`:''}
+      ${o.labels!==false&&w>.35&&d>.25?`<g transform="rotate(${-(+f.rot||0)})"><text text-anchor="middle" y="-.01" font-family="Figtree, sans-serif" font-weight="600" font-size="${Math.min(.13,Math.min(w,d)/4)}" fill="var(--ink)">${esc((f.label||k.l||'Item').replace(/ \(.*\)$/,'').slice(0,22))}</text><text text-anchor="middle" y="${Math.min(.13,Math.min(w,d)/4)}" font-family="JetBrains Mono, monospace" font-size="${Math.min(.09,Math.min(w,d)/6)}" fill="var(--muted)">${f.w}×${f.d}</text></g>`:''}
+      <title>${esc(f.label||k.l||'Item')} · ${f.w} × ${f.d} × ${f.h} mm${+f.elev?' · '+f.elev+' mm off floor':''}</title></g>`; }
+  return g;
+}
+function furn3D(r,b){ let h=''; for(const f of furnList().filter(f=>f.roomId===r.id)){ const w=f.w/1000*SCALE, d=f.d/1000*SCALE, H=Math.max(2,f.h/1000*SCALE), z=(+f.elev||0)/1000*SCALE; const cx=(f.x-r.x)*SCALE, cy=(f.y-r.y)*SCALE; const c=fFill(f);
+    const side=(x,y,L,a)=>`<div class="wl" style="left:${x}px;top:${y-H}px;width:${L}px;height:${H}px;background:color-mix(in srgb, ${c} 80%, #000 12%);border-top:0;transform:rotateZ(${a}deg) rotateX(-90deg)"></div>`;
+    h+=`<div class="fb" style="left:${cx-w/2}px;top:${cy-d/2}px;width:${w}px;height:${d}px;transform:translateZ(${z+1}px) rotateZ(${+f.rot||0}deg)">${side(0,0,w,0)}${side(w,0,d,90)}${side(w,d,w,180)}${side(0,d,d,270)}<div class="fbt" style="background:${c};transform:translateZ(${H}px)"></div></div>`; }
+  return h; }
+function furnEditor(f){ const k=FK[f.kind]||{};
+  return `<div style="display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px">
+   <div style="display:flex;gap:8px;align-items:center"><i style="width:16px;height:16px;border-radius:4px;background:${fFill(f)};border:1px solid var(--ink);flex:none"></i><b>${esc(f.label||k.l||'Item')}</b><span class="muted">· ${esc(roomName(f.roomId))}</span></div>
+   <label class="f" for="fuLabel">Name<input id="fuLabel" value="${esc(f.label||'')}" placeholder="${esc(k.l||'')}"></label>
+   <div class="grid3"><label class="f" for="fuW">Width (mm)<input id="fuW" type="number" min="50" step="10" value="${f.w}"></label><label class="f" for="fuD">Depth (mm)<input id="fuD" type="number" min="20" step="10" value="${f.d}"></label><label class="f" for="fuH">Height (mm)<input id="fuH" type="number" min="10" step="10" value="${f.h}"></label></div>
+   <label class="f" for="fuE">Underside off floor (mm)<input id="fuE" type="number" min="0" step="10" value="${f.elev||0}"></label>
+   <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small" type="button" data-frot="-90">⟲ Rotate</button><button class="btn small" type="button" data-frot="90">⟳ Rotate</button><button class="btn small" type="button" id="fuDup">Duplicate</button></div>
+   ${f.itemId&&S.items[f.itemId]?`<span class="muted" style="font-size:12px">In budget: <b>${esc(S.items[f.itemId].name)}</b> · ${eur(lineTotal(S.items[f.itemId]))}</span>`:`<button class="btn small" type="button" id="fuBudget">+ Add to budget</button>`}
+   <span class="muted" style="font-size:11.5px">Drag to move; edges snap to walls. Press R to rotate, Delete to remove.</span>
+   <div style="display:flex;justify-content:space-between"><button class="btn small" type="button" id="fuClose">Close</button><button class="btn small danger" type="button" id="fuDel">Delete</button></div></div>`; }
+function furnLibrary(){ const q=(UI.furnQ||'').toLowerCase(); return `<div class="flib"><input class="inp" id="furnQ" type="search" placeholder="Search furniture" value="${esc(UI.furnQ||'')}" aria-label="Search furniture">
+  ${FCATS.map(c=>{ const l=FURN.filter(f=>f.cat===c.key&&(!q||f.l.toLowerCase().includes(q))); if(!l.length) return ''; return `<div class="tool-h">${c.label}</div>`+l.map(f=>`<button type="button" class="fitem" data-fkind="${f.k}" aria-pressed="${UI.furnKind===f.k}"><i style="background:${c.fill}"></i><span>${esc(f.l)}</span><span class="mono">${f.w}×${f.d}</span></button>`).join(''); }).join('')}</div>`; }
+function rotFurn(id,deg){ const f=clone(S.furniture[id]); if(!f) return; f.rot=(((+f.rot||0)+deg)%360+360)%360; store.put('furniture',id,snapFurn(f)); }
+function delFurn(id){ store.del('furniture',id); if(UI.furnSel===id) UI.furnSel=null; }
+document.addEventListener('keydown',e=>{ if(UI.view!=='plans'||!UI.furnSel||!S.furniture[UI.furnSel]) return; const a=document.activeElement; if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT')) return; if(document.querySelector('.overlay')) return;
+  if(e.key==='r'||e.key==='R'){ e.preventDefault(); rotFurn(UI.furnSel,e.shiftKey?-90:90); } else if(e.key==='Delete'||e.key==='Backspace'){ e.preventDefault(); delFurn(UI.furnSel); } });
+function handleFurnClick(t){
+  const fk=t.closest('[data-fkind]'); if(fk){ UI.furnKind=fk.dataset.fkind; UI.tool='furn'; renderPlans(); toast('Click in a room to place it. It turns to face away from the nearest wall.'); return true; }
+  const fr=t.closest('[data-frot]'); if(fr&&UI.furnSel){ rotFurn(UI.furnSel,Number(fr.dataset.frot)); return true; }
+  if(t.closest('#fuClose')){ UI.furnSel=null; renderPlans(); return true; }
+  if(t.closest('#fuDel')&&UI.furnSel){ delFurn(UI.furnSel); return true; }
+  if(t.closest('#fuDup')&&UI.furnSel){ const f=clone(S.furniture[UI.furnSel]); const [hx]=fHalf(f); f.x=Math.round((f.x+hx*2+.05)*100)/100; delete f.itemId; const id=uid('f'); UI.furnSel=id; store.put('furniture',id,f); return true; }
+  if(t.closest('#fuBudget')&&UI.furnSel){ const f=clone(S.furniture[UI.furnSel]); const k=FK[f.kind]||{}; const cat={kitchen:'kitchen',appl:'appliances',bath:'plumbing',bed:'furniture',living:'furniture',store:'furniture',roof:'other'}[k.cat]||'furniture'; const iid=uid('i');
+    store.put('items',iid,{name:f.label||k.l||'Item',category:cat,roomId:f.roomId,qty:1,status:'idea',estimate:'',notes:`${f.w} × ${f.d} × ${f.h} mm`,quotes:[],chosen:'',created:Date.now()}); f.itemId=iid; store.put('furniture',UI.furnSel,f); toast('Added to the Budget. Log quotes for it there.'); return true; }
+  return false;
+}
+function handleFurnChange(t){
+  const map={fuW:'w',fuD:'d',fuH:'h',fuE:'elev'}; if(map[t.id]&&UI.furnSel){ const f=clone(S.furniture[UI.furnSel]); f[map[t.id]]=Math.max(0,Number(t.value)||0); store.put('furniture',UI.furnSel,['w','d'].includes(map[t.id])?snapFurn(f):f); return true; }
+  if(t.id==='fuLabel'&&UI.furnSel){ const f=clone(S.furniture[UI.furnSel]); f.label=t.value.trim(); store.put('furniture',UI.furnSel,f); return true; }
+  return false;
+}
+document.addEventListener('input',e=>{ if(e.target.id==='furnQ'){ UI.furnQ=e.target.value; clearTimeout(window._fq); window._fq=setTimeout(()=>{ const pos=e.target.selectionStart; const box=document.querySelector('.flib'); if(box){ const tmp=document.createElement('div'); tmp.innerHTML=furnLibrary(); box.replaceWith(tmp.firstElementChild); const n=$('#furnQ'); n.focus(); try{n.setSelectionRange(pos,pos);}catch(_){} } },200); } });
+
 /* ---------- Routing ---------- */
 const VIEWS=['house','tasks','timeline','plans','electrical','budget','dump','setup'];
 function go(v){ UI.view=v; if(location.hash!=='#'+v) history.replaceState(null,'','#'+v); const a=document.activeElement; a&&a.blur&&a.blur(); deferred=false; $('#main').innerHTML=''; render(); }
@@ -1910,6 +2025,7 @@ window.addEventListener('resize',()=>{ if(UI.view==='house'&&UI.dim==='3d'){ UI.
   store.watch('items',o=>{S.items=o; scheduleRender();});
   store.watch('boards',o=>{S.boards=o; scheduleRender();});
   store.watch('circuits',o=>{S.circuits=o; scheduleRender();});
+  store.watch('furniture',o=>{S.furniture=o; scheduleRender();});
   store.watchDoc('meta/house',m=>{ if(m) S.meta={...S.meta,...m}; scheduleRender(); });
   window.HUB={S,store,UI};
 })();
