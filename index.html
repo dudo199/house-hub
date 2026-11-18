@@ -806,7 +806,7 @@ function renderTimeline(){
 
 /* ----- Plans ----- */
 function planViewBox(vb){ const z=UI.pz||{k:1}; if(z.lv!==UI.planLevel||!z.k||z.k<=1.001) { UI.pz={k:1,lv:UI.planLevel}; return vb; } const w=vb[2]/z.k, h=vb[3]/z.k; const cx=Math.max(vb[0]+w/2,Math.min(vb[0]+vb[2]-w/2,z.cx)), cy=Math.max(vb[1]+h/2,Math.min(vb[1]+vb[3]-h/2,z.cy)); z.cx=cx; z.cy=cy; return [cx-w/2,cy-h/2,w,h]; }
-function planPtScale(){ const z=UI.pz; return z&&z.lv===UI.planLevel&&z.k>1?1/z.k:1; }
+function planPtScale(){ const z=UI.pz; return z&&z.lv===UI.planLevel&&z.k>1?Math.pow(z.k,-0.72):1; } // shrink a little less than the zoom so points stay readable
 function applyPlanZoom(){ const svg=$('#planSvg'); if(!svg) return; const vb=svg.dataset.vb.split(' ').map(Number); svg.setAttribute('viewBox',planViewBox(vb).join(' '));
   const s=planPtScale(); svg.querySelectorAll('.ptc').forEach(el=>{ const x=+el.dataset.ax, y=+el.dataset.ay; if(s===1) el.removeAttribute('transform'); else el.setAttribute('transform',`translate(${x} ${y}) scale(${s}) translate(${-x} ${-y})`); }); const l=$('#pzLabel'); if(l) l.textContent=Math.round((UI.pz.k||1)*100)+'%'; }
 function zoomPlanAt(f,px,py){ const svg=$('#planSvg'); if(!svg) return; const vb=svg.dataset.vb.split(' ').map(Number); const z=UI.pz&&UI.pz.lv===UI.planLevel?UI.pz:{k:1,lv:UI.planLevel}; if(z.cx==null||z.k<=1.001){z.cx=vb[0]+vb[2]/2; z.cy=vb[1]+vb[3]/2;}
