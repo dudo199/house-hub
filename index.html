@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>House Completion Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Layout: a site office. Top bar with overall progress, one working surface per view; the house view is a turnable 3D site model with a side rail. */
+  --paper:#e9ecea; --panel:#f8f9f8; --ink:#1b2226; --muted:#5d686f; --line:#cfd5d3; --accent:#2454c0;
+  --accent-soft:#dfe7f8; --accent-ink:#fff; --good:#2c8a4b; --warn:#c08308; --bad:#bf3f2c;
+  --floor:#dfe3df; --floor-out:#d4dccb; --wall:rgba(120,132,138,.34); --wall-top:#7d878c; --stage:#dde2df; --stage2:#cfd6d3;
+  --display:"IBM Plex Sans Condensed","Arial Narrow",sans-serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#12181c; --panel:#192127; --ink:#e3e8ea; --muted:#94a1a8; --line:#2c373e; --accent:#7ea2ff;
+    --accent-soft:#22304f; --accent-ink:#0f1418; --good:#55b877; --warn:#e0a83a; --bad:#ec6d58;
+    --floor:#2a343a; --floor-out:#2b3a2f; --wall:rgba(150,165,172,.22); --wall-top:#8a979e; --stage:#151c21; --stage2:#0f1418;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#12181c; --panel:#192127; --ink:#e3e8ea; --muted:#94a1a8; --line:#2c373e; --accent:#7ea2ff;
+  --accent-soft:#22304f; --accent-ink:#0f1418; --good:#55b877; --warn:#e0a83a; --bad:#ec6d58;
+  --floor:#2a343a; --floor-out:#2b3a2f; --wall:rgba(150,165,172,.22); --wall-top:#8a979e; --stage:#151c21; --stage2:#0f1418;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font:14px/1.45 var(--body);display:grid;grid-template-rows:auto auto 1fr;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:.01em}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono)}
+
+/* Top bar */
+.top{display:flex;align-items:center;gap:20px;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;min-width:150px}
+.brand h1{font-size:20px;line-height:1.1}
+.brand .sub{font-size:12px;color:var(--muted)}
+.overall{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:center;min-width:220px;flex:1;max-width:420px}
+.overall .pct{font:700 26px/1 var(--display);grid-row:span 2}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;position:relative}
+.bar i{display:block;height:100%;background:var(--good);border-radius:4px}
+.overall .meta{font-size:12px;color:var(--muted)}
+nav.tabs{display:flex;gap:2px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:3px;margin-left:auto}
+nav.tabs button{border:0;background:transparent;padding:6px 12px;border-radius:6px;font:600 13px var(--display);letter-spacing:.02em;color:var(--muted)}
+nav.tabs button[aria-current="page"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.btn{border:1px solid var(--line);background:var(--panel);padding:6px 12px;border-radius:7px;font-weight:500;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.small{padding:3px 9px;font-size:12px}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.danger{color:var(--bad);border-color:var(--bad);background:transparent}
+.btn:disabled{opacity:.5;cursor:default}
+.banner{padding:6px 18px;font-size:12.5px;background:var(--accent-soft);color:var(--ink);border-bottom:1px solid var(--line)}
+.banner:empty{display:none}
+main{overflow:auto;min-height:0;position:relative}
+
+/* Segmented controls and chips */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:transparent;padding:5px 10px;font-size:12.5px;color:var(--muted);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:1px 8px;border-radius:999px;background:var(--paper);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.pill{font:600 10.5px var(--display);letter-spacing:.05em;text-transform:uppercase;padding:1px 7px;border-radius:4px}
+.pill.todo{background:var(--line);color:var(--ink)}
+.pill.doing{background:var(--accent-soft);color:var(--accent)}
+.pill.waiting{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.done{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.pill.high{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
+.due.over{color:var(--bad);font-weight:600}
+.muted{color:var(--muted)}
+.empty{color:var(--muted);font-size:13px;padding:10px 0}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+label.f input,label.f select,label.f textarea{width:100%}
+label.f input,label.f select,label.f textarea,.inp{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 8px;font-size:13.5px;color:var(--ink);min-width:0}
+textarea{resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+
+/* House view */
+.house{display:grid;grid-template-columns:minmax(0,1fr) 380px;height:100%;min-height:520px}
+.stage-wrap{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.stage-tools{display:flex;gap:8px;flex-wrap:wrap;padding:10px 14px;align-items:center;border-bottom:1px solid var(--line);background:var(--panel)}
+#stage{flex:1;position:relative;overflow:hidden;perspective:2400px;perspective-origin:50% 38%;cursor:grab;touch-action:none;min-height:380px;
+  background:radial-gradient(ellipse at 50% 40%,var(--stage),var(--stage2))}
+#stage.drag{cursor:grabbing}
+#world{position:absolute;left:50%;top:50%;transform-style:preserve-3d}
+.lvl{position:absolute;left:0;top:0;transform-style:preserve-3d}
+.rm{position:absolute;transform-style:preserve-3d}
+.fl{position:absolute;inset:0;border:1px solid var(--wall-top);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center;padding:2px;overflow:hidden;
+  font:600 12px/1.1 var(--display);color:var(--ink);transform:translateZ(.5px)}
+.fl:hover{filter:brightness(1.06)}
+.fl.sel{outline:3px solid var(--accent);outline-offset:-3px}
+.fl .p{font:500 10.5px var(--mono);color:var(--muted)}
+.wl{position:absolute;transform-origin:0 100%;pointer-events:none;border-top:2px solid var(--wall-top)}
+.lvl-label{position:absolute;font:700 13px var(--display);letter-spacing:.12em;color:var(--muted);white-space:nowrap;pointer-events:none;transform:translateZ(1px)}
+.pt3{position:absolute;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:50%;border:2px solid;transform:translateZ(3px);pointer-events:none;background:var(--panel)}
+.stage-foot{position:absolute;left:12px;bottom:10px;right:12px;display:flex;justify-content:space-between;align-items:flex-end;gap:10px;pointer-events:none}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);padding:6px 10px;border-radius:8px;font-size:12px;pointer-events:auto;max-width:70%}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.zoom{display:flex;flex-direction:column;gap:4px;pointer-events:auto}
+.zoom button{width:32px;height:32px;border-radius:7px;border:1px solid var(--line);background:var(--panel);font-size:16px}
+.hint{font-size:11.5px;color:var(--muted);margin-top:4px}
+
+.rail{border-left:1px solid var(--line);background:var(--panel);overflow:auto;min-height:0;display:flex;flex-direction:column}
+.rail section{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.rail h2{font-size:16px}
+.rail h3{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sec-row{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;font-size:13px;cursor:pointer;padding:3px 0}
+.sec-row .bar{grid-column:span 2;height:6px}
+.sec-row .n{font:500 12px var(--mono);color:var(--muted)}
+.task-li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:start;padding:6px 0;border-top:1px solid var(--line)}
+.task-li:first-child{border-top:0}
+.task-li .t{cursor:pointer}
+.task-li .t b{font-weight:500}
+.task-li .sub{font-size:11.5px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:2px}
+.task-li input[type=checkbox]{margin-top:3px;width:16px;height:16px;accent-color:var(--good)}
+.task-li.done b{text-decoration:line-through;color:var(--muted)}
+.rtabs{display:flex;gap:0;border-bottom:1px solid var(--line);padding:0 10px;overflow-x:auto}
+.rtabs button{border:0;background:transparent;padding:9px 9px;font:600 12.5px var(--display);color:var(--muted);border-bottom:2px solid transparent}
+.rtabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.walltbl{border-collapse:collapse;width:100%;font-size:12.5px}
+.walltbl th{font:600 11px var(--display);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:center;padding:4px 2px}
+.walltbl th:first-child,.walltbl td:first-child{text-align:left}
+.walltbl td{padding:4px 2px;border-top:1px solid var(--line);text-align:center}
+.wcell{width:34px;height:26px;border-radius:6px;border:1px dashed var(--line);background:transparent;font-size:13px;line-height:1}
+.wcell.need{border:2px solid var(--c);color:var(--c);background:transparent}
+.wcell.done{border:2px solid var(--good);background:var(--good);color:#fff}
+.gallery{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.gallery figure{margin:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper);position:relative}
+.gallery img{width:100%;height:110px;object-fit:cover;display:block;cursor:zoom-in}
+.gallery figcaption{font-size:11.5px;padding:4px 6px;display:flex;justify-content:space-between;gap:4px;align-items:center}
+.ai-out{font-size:13px;white-space:pre-wrap;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.ai-out:empty{display:none}
+
+/* Tasks board */
+.page{padding:16px 18px;display:flex;flex-direction:column;gap:14px;min-height:100%}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.board{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:12px;align-items:start;overflow-x:auto;padding-bottom:6px}
+.col{background:var(--panel);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;min-height:160px}
+.col header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.col header h2{font-size:14px;letter-spacing:.03em}
+.col .cards{display:flex;flex-direction:column;gap:8px;padding:10px;min-height:80px}
+.col.over{outline:2px dashed var(--accent);outline-offset:-4px}
+.card{background:var(--paper);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:7px;padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;gap:5px}
+.card:hover{border-color:var(--muted);border-left-color:var(--c)}
+.card .meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:11.5px;color:var(--muted)}
+.card.dragging{opacity:.4}
+.sector-filter{display:flex;gap:6px;flex-wrap:wrap}
+.sector-filter button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px;font-size:12px;display:inline-flex;gap:6px;align-items:center}
+.sector-filter button[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:var(--panel)}
+
+/* Timeline */
+.tl-wrap{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:calc(100vh - 230px)}
+.tl{position:relative;min-width:100%}
+.tl-head{position:sticky;top:0;z-index:3;background:var(--panel);display:flex;border-bottom:1px solid var(--line)}
+.tl-head .lab,.tl-row .lab{position:sticky;left:0;z-index:2;background:var(--panel);width:240px;flex:none;padding:5px 10px;border-right:1px solid var(--line);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-track{position:relative;flex:none}
+.tl-head .wk{position:absolute;top:0;bottom:0;font:500 10.5px var(--mono);color:var(--muted);padding:6px 4px;border-left:1px solid var(--line);white-space:nowrap}
+.tl-row{display:flex;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);min-height:30px}
+.tl-row.grp .lab{font:600 12px var(--display);letter-spacing:.06em;text-transform:uppercase;display:flex;gap:6px;align-items:center}
+.tl-row.grp{background:var(--paper)}
+.tl-row.grp .lab{background:var(--paper)}
+.tl-bar{position:absolute;top:6px;height:18px;border-radius:5px;background:var(--c);opacity:.9;cursor:pointer;font-size:11px;color:#fff;padding:0 6px;white-space:nowrap;overflow:hidden;line-height:18px}
+.tl-bar.done{opacity:.35}
+.tl-bar.prop{outline:2px dashed var(--accent);outline-offset:1px}
+.tl-line{position:absolute;top:0;bottom:0;width:0;border-left:2px solid var(--accent);z-index:1;pointer-events:none}
+.tl-line.target{border-left:2px dashed var(--bad)}
+.tl-line span{position:absolute;top:2px;left:4px;font:600 10px var(--display);letter-spacing:.06em;text-transform:uppercase;background:var(--panel);padding:0 3px;white-space:nowrap}
+.tl-grid{position:absolute;top:0;bottom:0;border-left:1px solid color-mix(in srgb,var(--line) 55%,transparent);pointer-events:none}
+
+/* Plans */
+.plans{display:grid;grid-template-columns:220px minmax(0,1fr) 280px;gap:0;height:100%;min-height:520px}
+.plans aside{background:var(--panel);border-right:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+.plans aside.right{border-right:0;border-left:1px solid var(--line)}
+.tools{display:grid;grid-template-columns:1fr;gap:4px}
+.tools button{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:5px 8px;font-size:12.5px;text-align:left}
+.tools button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.glyph{width:20px;height:20px;border-radius:50%;border:2px solid var(--c);color:var(--c);display:inline-flex;align-items:center;justify-content:center;font:700 9px var(--mono);flex:none}
+.plan-stage{overflow:auto;padding:14px;display:flex;align-items:flex-start;justify-content:center;background:var(--paper)}
+.plan-stage svg{max-width:100%;height:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.plan-stage svg.placing{cursor:crosshair}
+.pt-list{display:flex;flex-direction:column;gap:4px;font-size:12.5px}
+.pt-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer}
+.pt-row:hover,.pt-row.sel{background:var(--accent-soft)}
+
+/* Brain dump */
+.dump{max-width:1100px;margin:0 auto;width:100%}
+.dump textarea{width:100%;min-height:170px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:12px 14px;font-size:15px;line-height:1.5}
+.dump-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mic[aria-pressed="true"]{background:var(--bad);border-color:var(--bad);color:#fff}
+.prop-tbl{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.prop-tbl th{font:600 11px var(--display);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+.prop-tbl td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.prop-tbl input[type=text]{width:100%}
+.prop-tbl .inp{width:100%}
+.tbl-wrap{overflow-x:auto}
+
+/* Modal, lightbox, toast */
+.overlay{position:fixed;inset:0;background:rgba(10,14,16,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal{background:var(--panel);border-radius:12px;border:1px solid var(--line);width:min(560px,100%);max-height:100%;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.modal .row-end{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.lightbox img{max-width:min(1100px,92vw);max-height:86vh;border-radius:8px;display:block}
+.lightbox{flex-direction:column;gap:8px;color:#fff}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:8px;font-size:13px;z-index:60;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}
+
+/* 2D house plan */
+#plan2d{position:absolute;inset:0;padding:16px 16px 70px;display:none}
+#plan2d svg{width:100%;height:100%}
+#stage.flat{cursor:default;background:var(--paper)}
+#stage.flat #plan2d{display:block}
+#stage.flat #world{display:none}
+#plan2d [data-room2]{cursor:pointer}
+#plan2d [data-room2]:hover{filter:brightness(1.06)}
+.placeholder-note{background:color-mix(in srgb,var(--warn) 14%,var(--panel));border-bottom:1px solid var(--line);padding:12px 16px;font-size:13px;display:flex;flex-direction:column;gap:6px}
+
+/* Setup */
+.setup{display:grid;grid-template-columns:minmax(0,600px) minmax(0,1fr);gap:0;height:100%;min-height:520px}
+.setup .form{overflow:auto;padding:16px 18px;display:flex;flex-direction:column;gap:18px;background:var(--panel);border-right:1px solid var(--line)}
+.setup .form section{display:flex;flex-direction:column;gap:10px}
+.setup h2{font-size:17px}
+.step{font:600 11px var(--mono);color:var(--accent);letter-spacing:.04em}
+.rtbl{border-collapse:collapse;width:100%;font-size:12.5px}
+.rtbl th{font:600 10.5px var(--display);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:4px 3px}
+.rtbl td{padding:3px;border-top:1px solid var(--line)}
+.rtbl input[type=number]{width:58px}
+.rtbl input[type=text]{width:100%;min-width:110px}
+.rtbl tr.sel td{background:var(--accent-soft)}
+.rtbl .inp{padding:4px 6px;font-size:12.5px}
+.setup .preview{overflow:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:var(--paper)}
+.setup .preview svg{width:100%;height:auto;max-height:calc(100vh - 200px);background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.warn-list{font-size:12.5px;color:var(--warn);margin:0;padding-left:18px}
+.okline{font-size:12.5px;color:var(--good)}
+.csv{font:12px/1.4 var(--mono);width:100%;min-height:110px;border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:8px}
+
+/* Budget */
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.tile .k{font:600 11px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tile .v{font:700 24px/1.15 var(--display);font-variant-numeric:tabular-nums}
+.tile .s{font-size:12px;color:var(--muted)}
+.budget-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+.btbl{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:13px}
+.btbl th{font:600 10.5px var(--display);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.btbl td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+.btbl tr[data-item]{cursor:pointer}
+.btbl tr[data-item]:hover td{background:var(--paper)}
+.btbl .r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.btbl tr.cat td{background:var(--paper);font:600 11px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.pill.idea{background:var(--line);color:var(--ink)}
+.pill.quoted{background:var(--accent-soft);color:var(--accent)}
+.pill.ordered{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.paid,.pill.delivered{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.quotes{display:flex;flex-direction:column;gap:8px}
+.quote{border:1px solid var(--line);border-radius:8px;padding:8px;display:grid;grid-template-columns:auto 1fr 110px auto;gap:6px 8px;align-items:center}
+.quote.chosen{border-color:var(--good);background:color-mix(in srgb,var(--good) 7%,var(--panel))}
+.quote .wide{grid-column:2 / span 3;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.quote .best{font:600 10px var(--display);color:var(--good);letter-spacing:.06em;text-transform:uppercase}
+.export{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;background:var(--paper)}
+.export label{display:flex;gap:8px;align-items:center;font-size:13px}
+
+@media (max-width:980px){
+  .setup{grid-template-columns:1fr;height:auto}
+  .setup .form{border-right:0;border-bottom:1px solid var(--line)}
+  .tiles{grid-template-columns:repeat(2,1fr)}
+  .budget-grid{grid-template-columns:1fr}
+}
+@media (max-width:980px){
+  body{overflow:auto;display:block}
+  main{overflow:visible}
+  .house{grid-template-columns:1fr;height:auto}
+  #stage{height:60vh;flex:none}
+  .rail{border-left:0;border-top:1px solid var(--line)}
+  .plans{grid-template-columns:1fr;height:auto}
+  .plans aside{border-right:0;border-bottom:1px solid var(--line)}
+  .tools{grid-template-columns:repeat(2,1fr)}
+  nav.tabs{margin-left:0;overflow-x:auto;max-width:100%}
+  .board{grid-template-columns:repeat(4,minmax(240px,1fr))}
+}
+@media (max-width:480px){ .grid2,.grid3{grid-template-columns:1fr} .top{gap:10px} }
+@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><h1 id="houseName">House</h1><span class="sub" id="houseSub">3 levels</span></div>
+  <div class="overall" id="overall"></div>
+  <nav class="tabs" id="tabs" aria-label="Views">
+    <button data-view="house">House</button>
+    <button data-view="tasks">Tasks</button>
+    <button data-view="timeline">Timeline</button>
+    <button data-view="plans">Plans</button>
+    <button data-view="dump">Brain dump</button>
+    <button data-view="budget">Budget</button>
+    <button data-view="setup">Setup</button>
+  </nav>
+  <button class="btn primary" id="newTaskBtn" type="button">+ New task</button>
+</header>
+<div class="banner" id="banner"></div>
+<main id="main"></main>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ---------- Constants ---------- */
+const SECTORS=[
+  {key:'walls',label:'Plastering & wall works',color:'#a47a45'},
+  {key:'electrical',label:'Electrical',color:'#d29500'},
+  {key:'plumbing',label:'Plumbing',color:'#2e7bd6'},
+  {key:'painting',label:'Painting',color:'#c2457a'},
+  {key:'furniture',label:'Furniture & kitchen',color:'#2a9680'},
+  {key:'lighting',label:'Lighting',color:'#8a5fd4'}
+];
+const SEC=Object.fromEntries(SECTORS.map(s=>[s.key,s]));
+const STATUSES=[{key:'todo',label:'To do'},{key:'doing',label:'In progress'},{key:'waiting',label:'Waiting'},{key:'done',label:'Done'}];
+const STAT=Object.fromEntries(STATUSES.map(s=>[s.key,s]));
+const LEVELS=['Ground floor','First floor','Roof'];
+const WALLS=[{key:'front',label:'Front'},{key:'right',label:'Right'},{key:'back',label:'Back'},{key:'left',label:'Left'},{key:'ceiling',label:'Ceiling'}];
+const STAGES=[
+  {key:'shave',label:'Shave off',short:'Shave',sector:'walls',color:'#b4502f'},
+  {key:'plaster',label:'Plaster',short:'Plaster',sector:'walls',color:'#a47a45'},
+  {key:'render',label:'Render',short:'Render',sector:'walls',color:'#5f7c93'},
+  {key:'paint',label:'Paint',short:'Paint',sector:'painting',color:'#c2457a'}
+];
+const PTYPES=[
+  {key:'socket',label:'Socket',sector:'electrical',g:'S'},
+  {key:'switch',label:'Switch',sector:'electrical',g:'SW'},
+  {key:'data',label:'Data / TV',sector:'electrical',g:'TV'},
+  {key:'ac',label:'A/C unit',sector:'electrical',g:'AC'},
+  {key:'cu',label:'Consumer unit',sector:'electrical',g:'CU'},
+  {key:'light',label:'Light point',sector:'lighting',g:'L'},
+  {key:'cold',label:'Cold water',sector:'plumbing',g:'C'},
+  {key:'hot',label:'Hot water',sector:'plumbing',g:'H'},
+  {key:'waste',label:'Waste / drain',sector:'plumbing',g:'W'},
+  {key:'gas',label:'Gas',sector:'plumbing',g:'G'}
+];
+const PT=Object.fromEntries(PTYPES.map(p=>[p.key,p]));
+const CATS=[
+  {key:'kitchen',label:'Kitchen units & worktops'},{key:'appliances',label:'Kitchen appliances'},{key:'lighting',label:'Lighting fixtures'},
+  {key:'materials',label:'Building materials'},{key:'electrical',label:'Electrical supplies'},{key:'plumbing',label:'Plumbing & sanitaryware'},
+  {key:'paint',label:'Paint & finishes'},{key:'tiles',label:'Tiles & flooring'},{key:'furniture',label:'Furniture'},{key:'labour',label:'Labour & contractors'},{key:'other',label:'Other'}
+];
+const CAT=Object.fromEntries(CATS.map(c=>[c.key,c]));
+const ISTAT=[{key:'idea',label:'Idea'},{key:'quoted',label:'Quoted'},{key:'ordered',label:'Ordered'},{key:'paid',label:'Paid'},{key:'delivered',label:'Delivered'}];
+const IST=Object.fromEntries(ISTAT.map(s=>[s.key,s]));
+const OPEN_TYPES=[{key:'door',label:'Door'},{key:'window',label:'Window'},{key:'opening',label:'Opening / arch'}];
+const eur=n=>n==null||isNaN(n)?'—':new Intl.NumberFormat('en-MT',{style:'currency',currency:'EUR',maximumFractionDigits:n%1?2:0}).format(n);
+const SCALE=34; // px per metre in the 3D model
+
+/* ---------- State ---------- */
+const S={rooms:{},tasks:{},points:{},items:{},meta:{name:'The Townhouse',target:'',daysPerWeek:3,width:0,depth:0,heights:[2.9,2.9,2.4],setupDone:false},loaded:{rooms:false,tasks:false,points:false}};
+const UI={view:'house',level:'all',layer:'progress',full:false,spin:-32,tilt:52,zoom:null,room:null,roomTab:'tasks',editRoom:null,
+  tf:{sectors:[],room:'',q:''},planLevel:0,tool:'select',planSel:null,planLayers:{walls:true,electrical:true,plumbing:true},
+  dump:{text:'',rows:null,busy:false,summary:''},tl:{proposal:null,busy:false,note:''},advice:{text:'',busy:false},showAllDone:false,
+  dim:'3d',setupLevel:0,setupSel:null,csv:{text:'',prune:false,msg:''},bf:{cat:'',q:'',room:''},
+  exp:{disc:{arch:true,elec:true,plumb:true,walls:false},levels:[true,true,true],busy:false}};
+let CAP={sample:null,dictation:null,assets:null,downloads:null};
+const itemList=()=>Object.entries(S.items).map(([id,t])=>({id,...t}));
+
+/* ---------- Helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const clone=o=>JSON.parse(JSON.stringify(o||{}));
+const todayISO=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const toDate=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const addDays=(s,n)=>{const d=toDate(s);d.setDate(d.getDate()+n);return iso(d)};
+const daysBetween=(a,b)=>Math.round((toDate(b)-toDate(a))/864e5);
+const fmtD=s=>s?toDate(s).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'';
+const validISO=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s);
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2600)}
+const roomList=()=>Object.entries(S.rooms).map(([id,r])=>({id,...r})).sort((a,b)=>(a.level-b.level)||(a.y-b.y)||(a.x-b.x));
+const taskList=()=>Object.entries(S.tasks).map(([id,t])=>({id,...t}));
+const pointList=()=>Object.entries(S.points).map(([id,p])=>({id,...p}));
+const roomName=id=>S.rooms[id]?.name||'';
+const isOver=t=>t.status!=='done'&&t.due&&t.due<todayISO();
+
+/* ---------- Store (db when available, memory otherwise) ---------- */
+const store={db:null,mem:{rooms:{},tasks:{},points:{},items:{},meta:{}},subs:{},queues:{},
+  async init(){
+    let use=null;
+    for(let i=0;i<20&&!use;i++){ if(window.claude&&typeof window.claude.use==='function') use=window.claude.use; else await new Promise(r=>setTimeout(r,100)); }
+    if(!use){ setBanner('Preview mode: changes are not saved here. Open the published page to keep your data.'); return; }
+    try{ this.db=await window.claude.use('db'); }catch(e){ this.db=null; }
+    if(!this.db) setBanner('Saving is unavailable in this view, so changes last only until you close the page.');
+    const get=n=>window.claude.use(n).catch(()=>null);
+    [CAP.sample,CAP.dictation,CAP.assets,CAP.downloads]=await Promise.all([get('sample'),get('dictation'),get('assets'),get('downloads')]);
+    if(CAP.dictation){
+      CAP.dictation.onFinal(({text})=>{ const ta=$('#dumpText'); const add=(text||'').trim(); if(!add) return; UI.dump.text=(UI.dump.text?UI.dump.text.replace(/\s*$/,' '):'')+add; if(ta){ta.value=UI.dump.text;} });
+      CAP.dictation.onPartial(({text})=>{ const el=$('#partial'); if(el) el.textContent=text||''; });
+      CAP.dictation.onState(({state})=>{ UI.listening=state==='listening'; const b=$('#micBtn'); if(b){b.setAttribute('aria-pressed',UI.listening?'true':'false');b.textContent=UI.listening?'■ Stop':'🎙 Speak';} if(!UI.listening){const el=$('#partial'); if(el) el.textContent='';} });
+    }
+  },
+  watch(col,cb){
+    if(this.db){
+      const timer=setTimeout(()=>setBanner('Your saved data is taking a while to load. It may be out of date until it arrives.'),10000);
+      this.db.collection(col).onSnapshot(snap=>{ if(!snap.metadata.fromCache){clearTimeout(timer); if($('#banner').dataset.slow) setBanner('');} const o={}; snap.docs.forEach(d=>{o[d.id]=d.data()}); cb(o); },
+        err=>{clearTimeout(timer); setBanner('Could not load '+col+' ('+(err&&err.code||'error')+'). Reload the page to try again.');});
+    } else { (this.subs[col]=this.subs[col]||[]).push(cb); cb({...this.mem[col]}); }
+  },
+  watchDoc(path,cb){
+    if(this.db){ this.db.doc(path).onSnapshot(s=>cb(s.exists?s.data():null),()=>{}); }
+    else { const [c,id]=path.split('/'); cb(this.mem[c][id]||null); (this.subs[path]=this.subs[path]||[]).push(cb); }
+  },
+  _q(path,fn){ const p=(this.queues[path]||Promise.resolve()).then(fn).catch(e=>{ console.error(e); toast(e&&e.code==='quota_exceeded'?'Storage is full: delete some items and try again.':'Could not save that change. Try again.'); }); this.queues[path]=p; return p; },
+  put(col,id,data){
+    S[col==='meta'?'_meta':col];
+    if(col!=='meta'){ S[col][id]=data; } else { S.meta={...S.meta,...data}; }
+    scheduleRender();
+    const path=col+'/'+id;
+    if(this.db) return this._q(path,()=>this.db.doc(path).set(data));
+    this.mem[col][id]=data; (this.subs[col]||[]).forEach(cb=>cb({...this.mem[col]})); (this.subs[path]||[]).forEach(cb=>cb(data));
+  },
+  del(col,id){
+    delete S[col][id]; scheduleRender();
+    const path=col+'/'+id;
+    if(this.db) return this._q(path,()=>this.db.doc(path).delete());
+    delete this.mem[col][id]; (this.subs[col]||[]).forEach(cb=>cb({...this.mem[col]}));
+  }
+};
+function setBanner(t){const b=$('#banner'); b.textContent=t; b.dataset.slow=t.startsWith('Your saved data')?'1':'';}
+const saveTask=(id,t)=>store.put('tasks',id,t);
+const saveRoom=(id,r)=>store.put('rooms',id,r);
+const savePoint=(id,p)=>store.put('points',id,p);
+const saveMeta=m=>store.put('meta','house',{...S.meta,...m});
+
+/* ---------- Progress ---------- */
+function items(filter={}){
+  const out=[];
+  for(const t of taskList()){ if(filter.room&&t.roomId!==filter.room) continue; out.push({sector:t.sector,done:t.status==='done'}); }
+  for(const r of roomList()){ if(filter.room&&r.id!==filter.room) continue; const w=r.walls||{};
+    for(const wk of WALLS){ const st=w[wk.key]||{}; for(const sg of STAGES){ if(st[sg.key]) out.push({sector:sg.sector,done:st[sg.key]==='done'}); } } }
+  for(const p of pointList()){ if(filter.room&&p.roomId!==filter.room) continue; const ty=PT[p.type]; if(ty) out.push({sector:ty.sector,done:!!p.done}); }
+  return out;
+}
+function progress(list){ const total=list.length, done=list.filter(i=>i.done).length; return {total,done,pct:total?Math.round(done/total*100):null}; }
+function bySector(){ const all=items(); const o={}; for(const s of SECTORS){ o[s.key]=progress(all.filter(i=>i.sector===s.key)); } return o; }
+function pctColor(p,alpha=1){ if(p==null) return null; const h=8+(135-8)*(p/100); return `hsla(${h},62%,${document.documentElement.dataset.theme==='dark'||matchMedia('(prefers-color-scheme: dark)').matches&&document.documentElement.dataset.theme!=='light'?40:55}%,${alpha})`; }
+function wallState(st){ st=st||{}; const req=STAGES.filter(s=>st[s.key]); if(!req.length) return null; const next=req.find(s=>st[s.key]!=='done'); return next?{color:next.color,label:next.label}:{color:'var(--good)',label:'Finished'}; }
+
+/* ---------- Rendering ---------- */
+let renderPending=false, deferred=false;
+function scheduleRender(){ if(renderPending) return; renderPending=true; requestAnimationFrame(()=>{renderPending=false; render();}); }
+function isTyping(){ const a=document.activeElement; return a&&$('#main').contains(a)&&(a.tagName==='TEXTAREA'||(a.tagName==='INPUT'&&!['checkbox','button','file','radio'].includes(a.type))||a.tagName==='SELECT'); }
+document.addEventListener('focusout',()=>{ if(deferred){ setTimeout(()=>{ if(!isTyping()){deferred=false; render();} },0);} });
+function render(){
+  renderTop();
+  if(isTyping()){ deferred=true; return; }
+  const v=UI.view;
+  if(v==='house') renderHouse(); else if(v==='tasks') renderTasks(); else if(v==='timeline') renderTimeline(); else if(v==='plans') renderPlans(); else if(v==='budget') renderBudget(); else if(v==='setup') renderSetup(); else renderDump();
+}
+function renderTop(){
+  $('#houseName').textContent=S.meta.name||'My house';
+  const rooms=roomList(); const p=progress(items());
+  $('#houseSub').textContent=`${LEVELS.length} levels · ${rooms.length} rooms`;
+  let meta=`${p.done} of ${p.total} items done`;
+  if(S.meta.target){ const d=daysBetween(todayISO(),S.meta.target); meta+= d>=0?` · ${Math.ceil(d/7)} weeks to target (${fmtD(S.meta.target)})`:` · target date passed`; }
+  $('#overall').innerHTML=`<div class="pct num">${p.pct??0}%</div><div class="bar" title="Overall progress"><i style="width:${p.pct??0}%"></i></div><div class="meta num">${esc(meta)}</div>`;
+  document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-current',b.dataset.view===UI.view?'page':'false'));
+}
+
+/* ----- House (3D) ----- */
+function renderHouse(){
+  const main=$('#main');
+  if(!main.querySelector('.house')){
+    main.innerHTML=`<section class="house">
+      <div class="stage-wrap">
+        <div class="stage-tools">
+          <div class="seg" id="levelSeg" role="group" aria-label="Level"></div>
+          <div class="seg" id="layerSeg" role="group" aria-label="Layer"></div>
+          <div class="seg" role="group" aria-label="View"><button type="button" id="dim3">3D</button><button type="button" id="dim2">2D plan</button></div>
+          <div class="seg" role="group" aria-label="Walls" id="wallSeg"><button type="button" id="wallLow">Cutaway</button><button type="button" id="wallFull">Full height</button></div>
+        </div>
+        <div id="stage"><div id="world"></div><div id="plan2d"></div>
+          <div class="stage-foot"><div><div class="legend" id="legend"></div><div class="hint">Drag to turn · scroll or use + / − to zoom · click a room to open it</div></div>
+          <div class="zoom"><button type="button" id="zin" aria-label="Zoom in">+</button><button type="button" id="zout" aria-label="Zoom out">−</button><button type="button" id="zreset" aria-label="Reset view" title="Reset view">⟲</button></div></div>
+        </div>
+      </div>
+      <aside class="rail" id="rail"></aside></section>`;
+    bindStage();
+  }
+  $('#levelSeg').innerHTML=[['all','All levels'],[0,'Ground'],[1,'First'],[2,'Roof']].map(([k,l])=>`<button type="button" data-level="${k}" aria-pressed="${String(UI.level)===String(k)}">${l}</button>`).join('');
+  $('#layerSeg').innerHTML=[['progress','Progress'],['walls','Wall works'],['electrical','Electrical'],['plumbing','Plumbing']].map(([k,l])=>`<button type="button" data-layer="${k}" aria-pressed="${UI.layer===k}">${l}</button>`).join('');
+  $('#wallLow').setAttribute('aria-pressed',String(!UI.full)); $('#wallFull').setAttribute('aria-pressed',String(UI.full));
+  $('#dim3').setAttribute('aria-pressed',String(UI.dim==='3d')); $('#dim2').setAttribute('aria-pressed',String(UI.dim==='2d'));
+  $('#wallSeg').style.display=UI.dim==='2d'?'none':''; $('#stage').classList.toggle('flat',UI.dim==='2d');
+  const hint=$('#stage .hint'); if(hint) hint.textContent=UI.dim==='2d'?'Click a room to open it':'Drag to turn · scroll or use + / − to zoom · click a room to open it';
+  $('#stage .zoom').style.display=UI.dim==='2d'?'none':'';
+  if(UI.dim==='2d') build2D(); else build3D(); renderLegend(); renderRail();
+}
+function renderLegend(){
+  let h='';
+  if(UI.layer==='progress') h=`<span><i class="dot" style="background:${pctColor(0)}"></i>Not started</span><span><i class="dot" style="background:${pctColor(50)}"></i>Halfway</span><span><i class="dot" style="background:${pctColor(100)}"></i>Finished</span><span><i class="dot" style="background:var(--floor);border:1px solid var(--wall-top)"></i>Nothing logged yet</span>`;
+  else if(UI.layer==='walls') h=STAGES.map(s=>`<span><i class="dot" style="background:${s.color}"></i>Needs ${s.label.toLowerCase()}</span>`).join('')+`<span><i class="dot" style="background:var(--good)"></i>Wall finished</span>`;
+  else { const sec=UI.layer==='electrical'?['electrical','lighting']:['plumbing']; h=PTYPES.filter(p=>sec.includes(p.sector)).map(p=>`<span><span class="glyph" style="--c:${SEC[p.sector].color};width:16px;height:16px;font-size:7px">${p.g}</span>${p.label}</span>`).join('')+`<span class="muted">Filled = done</span>`; }
+  $('#legend').innerHTML=h;
+}
+function houseBounds(){ const rs=roomList(); const fw=+S.meta.width||0, fd=+S.meta.depth||0; if(!rs.length) return {x0:0,y0:0,x1:fw||6,y1:fd||12};
+  const b={x0:Math.min(...rs.map(r=>r.x)),y0:Math.min(...rs.map(r=>r.y)),x1:Math.max(...rs.map(r=>r.x+r.w)),y1:Math.max(...rs.map(r=>r.y+r.d))};
+  if(fw>0&&fd>0){ b.x0=Math.min(b.x0,0); b.y0=Math.min(b.y0,0); b.x1=Math.max(b.x1,fw); b.y1=Math.max(b.y1,fd); } return b; }
+function levelGap(){ return (3+(UI.level==='all'?4.2:0))*SCALE; }
+function build3D(){
+  const world=$('#world'); if(!world) return;
+  const b=houseBounds(); const W=(b.x1-b.x0)*SCALE, D=(b.y1-b.y0)*SCALE;
+  world.style.width=W+'px'; world.style.height=D+'px'; world.style.marginLeft=(-W/2)+'px'; world.style.marginTop=(-D/2)+'px';
+  const levels=UI.level==='all'?[0,1,2]:[Number(UI.level)];
+  const rs=roomList(); const pts=pointList();
+  const showSec=UI.layer==='electrical'?['electrical','lighting']:UI.layer==='plumbing'?['plumbing']:[];
+  let html='';
+  levels.forEach((lv,i)=>{
+    const z=i*levelGap();
+    html+=`<div class="lvl" style="transform:translateZ(${z}px);width:${W}px;height:${D}px">`;
+    html+=`<div class="lvl-label" style="left:${W+14}px;top:${D/2-8}px">${LEVELS[lv].toUpperCase()}</div>`;
+    if(lv===levels[0]) html+=`<div class="lvl-label" style="left:0;top:-30px;width:${W}px;text-align:center">STREET ↑ FRONT</div>`;
+    for(const r of rs.filter(r=>r.level===lv)){
+      const x=(r.x-b.x0)*SCALE, y=(r.y-b.y0)*SCALE, w=r.w*SCALE, d=r.d*SCALE;
+      const pr=progress(items({room:r.id}));
+      let floor=r.outdoor?'var(--floor-out)':'var(--floor)';
+      if(UI.layer==='progress'&&pr.pct!=null) floor=pctColor(pr.pct,.8);
+      const H=(r.outdoor?1.0:(UI.full?(+(S.meta.heights||[])[lv]||2.7):1.1))*SCALE;
+      const walls=[{k:'front',x:0,y:1,L:w,a:0},{k:'right',x:w-1,y:0,L:d,a:90},{k:'back',x:w,y:d-1,L:w,a:180},{k:'left',x:1,y:d,L:d,a:270}];
+      let wh='';
+      for(const wl of walls){
+        let bg='var(--wall)';
+        if(UI.layer==='walls'){ const s=wallState((r.walls||{})[wl.k]); if(s) bg=`color-mix(in srgb, ${s.color} 72%, transparent)`; }
+        wh+=`<div class="wl" style="left:${wl.x}px;top:${wl.y-H}px;width:${wl.L}px;height:${H}px;background:${bg};transform:rotateZ(${wl.a}deg) rotateX(-90deg)"></div>`;
+      }
+      let ph='';
+      if(showSec.length){ for(const p of pts.filter(p=>p.roomId===r.id&&PT[p.type]&&showSec.includes(PT[p.type].sector))){ const c=SEC[PT[p.type].sector].color; ph+=`<div class="pt3" style="left:${(p.x-r.x)*SCALE}px;top:${(p.y-r.y)*SCALE}px;border-color:${c};${p.done?`background:${c}`:''}"></div>`; } }
+      const label=w>44&&d>30?`<span>${esc(r.name)}</span>${pr.pct!=null&&UI.layer==='progress'?`<span class="p">${pr.pct}%</span>`:''}`:'';
+      html+=`<div class="rm" style="left:${x}px;top:${y}px;width:${w}px;height:${d}px"><div class="fl${UI.room===r.id?' sel':''}" data-room="${r.id}" style="background:${floor}" title="${esc(r.name)}">${label}</div>${ph}${wh}</div>`;
+    }
+    html+='</div>';
+  });
+  world.innerHTML=html;
+  if(UI.zoom==null){ const st=$('#stage').getBoundingClientRect(); const fit=Math.min(st.width*.82/Math.hypot(W,D), st.height*.8/(Math.hypot(W,D)*Math.cos(UI.tilt*Math.PI/180)+(levels.length-1)*levelGap()*Math.sin(UI.tilt*Math.PI/180)+60)); UI.zoom=Math.max(.35,Math.min(2.2,(fit||1)*1.3)); }
+  applyCam();
+}
+function applyCam(){ const w=$('#world'); if(!w) return; const n=UI.level==='all'?3:1; const zc=(n-1)*levelGap()/2+40;
+  w.style.transform=`scale(${UI.zoom}) rotateX(${UI.tilt}deg) rotateZ(${UI.spin}deg) translateZ(${-zc}px)`; }
+function bindStage(){
+  const st=$('#stage'); let drag=null; UI._dragged=false;
+  st.addEventListener('pointerdown',e=>{ if(UI.dim==='2d'||e.target.closest('.zoom,.legend')) return; drag={x:e.clientX,y:e.clientY,spin:UI.spin,tilt:UI.tilt}; UI._dragged=false; });
+  window.addEventListener('pointermove',e=>{ if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if(Math.abs(dx)+Math.abs(dy)>4){UI._dragged=true; st.classList.add('drag');}
+    UI.spin=drag.spin+dx*.4; UI.tilt=Math.max(8,Math.min(84,drag.tilt-dy*.3)); applyCam(); });
+  window.addEventListener('pointerup',()=>{ drag=null; st.classList.remove('drag'); });
+  st.addEventListener('wheel',e=>{ if(UI.dim==='2d') return; e.preventDefault(); UI.zoom=Math.max(.3,Math.min(3,UI.zoom*Math.exp(-e.deltaY*.0012))); applyCam(); },{passive:false});
+  st.addEventListener('click',e=>{
+    if(e.target.closest('#zin')){UI.zoom=Math.min(3,UI.zoom*1.2);applyCam();return;}
+    if(e.target.closest('#zout')){UI.zoom=Math.max(.3,UI.zoom/1.2);applyCam();return;}
+    if(e.target.closest('#zreset')){UI.spin=-32;UI.tilt=52;UI.zoom=null;build3D();return;}
+    if(UI._dragged) return;
+    const f=e.target.closest('.fl'); if(f){ openRoom(f.dataset.room); return; }
+    const f2=e.target.closest('[data-room2]'); if(f2){ openRoom(f2.dataset.room2); }
+  });
+}
+function openRoom(id){ UI.room=id; UI.editRoom=null; if(UI.view!=='house'){UI.view='house'; location.hash='house';} render(); }
+
+/* ----- Rail ----- */
+function taskLi(t){
+  const s=SEC[t.sector]||{color:'#999',label:t.sector};
+  return `<div class="task-li${t.status==='done'?' done':''}"><input type="checkbox" data-done="${t.id}" ${t.status==='done'?'checked':''} aria-label="Mark ${esc(t.title)} done">
+  <div class="t" data-open-task="${t.id}"><b>${esc(t.title)}</b><div class="sub"><span class="dot" style="background:${s.color}"></span>${esc(s.label)}${t.roomId&&UI.room!==t.roomId?` · ${esc(roomName(t.roomId))}`:''}${t.due?` · <span class="due${isOver(t)?' over':''}">due ${fmtD(t.due)}</span>`:''}</div></div>
+  <span class="pill ${t.priority==='high'&&t.status!=='done'?'high':t.status}">${t.priority==='high'&&t.status!=='done'?'High':STAT[t.status]?.label||''}</span></div>`;
+}
+function renderRail(){
+  const rail=$('#rail'); if(!rail) return;
+  if(UI.editRoom) { rail.innerHTML=roomEditor(UI.editRoom==='new'?null:UI.editRoom); return; }
+  if(UI.room&&S.rooms[UI.room]){ rail.innerHTML=roomPanel(UI.room); return; }
+  const bs=bySector(); const ts=taskList();
+  const note=S.meta.setupDone?'':`<div class="placeholder-note"><b>This is a placeholder layout.</b><span>Measure your house and enter the real rooms, doors and windows in Setup. Your tasks stay linked to their rooms.</span><button class="btn small" type="button" data-goview="setup" style="align-self:flex-start">Open Setup</button></div>`;
+  const open=ts.filter(t=>t.status==='todo'||t.status==='doing').sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')||((b.priority==='high')-(a.priority==='high'))||(a.created-b.created));
+  const waiting=ts.filter(t=>t.status==='waiting');
+  const overdue=ts.filter(isOver).length;
+  rail.innerHTML=note+`
+  <section><h2>Progress by trade</h2>
+   ${SECTORS.map(s=>{const p=bs[s.key];return `<div class="sec-row" data-sector="${s.key}" title="Show these tasks"><span style="display:flex;gap:7px;align-items:center"><i class="dot" style="background:${s.color}"></i>${esc(s.label)}</span><span class="n">${p.total?`${p.done}/${p.total} · ${p.pct}%`:'nothing logged'}</span><div class="bar"><i style="width:${p.pct||0}%;background:${s.color}"></i></div></div>`}).join('')}
+   <p class="muted" style="font-size:12px;margin:0">Counts tasks, wall stages and plan points.${overdue?` <b style="color:var(--bad)">${overdue} overdue.</b>`:''}</p>
+  </section>
+  <section><div style="display:flex;justify-content:space-between;align-items:center"><h2>Next up</h2><span class="muted num" style="font-size:12px">${open.length} open</span></div>
+   ${open.slice(0,7).map(taskLi).join('')||'<div class="empty">No open tasks. Add some, or use Brain dump.</div>'}
+  </section>
+  ${waiting.length?`<section><h2>Waiting on</h2>${waiting.map(taskLi).join('')}</section>`:''}
+  <section><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>What should I do next?</h2>
+   ${CAP.sample?`<button class="btn small" type="button" id="adviceBtn" ${UI.advice.busy?'disabled':''}>${UI.advice.busy?'Thinking…':'Ask Claude'}</button>`:''}</div>
+   ${CAP.sample?`<div class="ai-out" id="adviceOut">${esc(UI.advice.text)}</div>`:'<div class="empty">AI suggestions work on the published page.</div>'}
+  </section>
+  <section><div style="display:flex;justify-content:space-between;align-items:center"><h2>Rooms</h2><button class="btn small" type="button" id="addRoomBtn">+ Add room</button></div>
+   ${LEVELS.map((L,lv)=>`<div><div class="muted" style="font:600 11px var(--display);letter-spacing:.08em;text-transform:uppercase;margin:4px 0">${L}</div>${roomList().filter(r=>r.level===lv).map(r=>{const p=progress(items({room:r.id}));return `<div class="sec-row" data-room-open="${r.id}"><span>${esc(r.name)}</span><span class="n">${p.total?p.pct+'%':'—'}</span></div>`}).join('')}</div>`).join('')}
+  </section>
+  <section><h2>House details</h2>
+   <label class="f" for="metaName">House name<input id="metaName" value="${esc(S.meta.name||'')}"></label>
+  </section>`;
+}
+function roomPanel(id){
+  const r=S.rooms[id]; const p=progress(items({room:id}));
+  const tabs=[['tasks','Tasks'],['walls','Walls'],['points','Points'],['vision','Vision'],['notes','Notes'],['edit','Edit']];
+  let body='';
+  const rt=taskList().filter(t=>t.roomId===id);
+  if(UI.roomTab==='tasks'){
+    const open=rt.filter(t=>t.status!=='done'), done=rt.filter(t=>t.status==='done');
+    body=`<section>
+      <form id="quickAdd" style="display:flex;gap:6px;flex-wrap:wrap"><input class="inp" id="qaTitle" placeholder="Add a task for this room" style="flex:1;min-width:140px" required>
+      <select class="inp" id="qaSector" aria-label="Trade">${SECTORS.map(s=>`<option value="${s.key}">${esc(s.label)}</option>`).join('')}</select><button class="btn" type="submit">Add</button></form>
+      ${open.map(taskLi).join('')||'<div class="empty">No open tasks in this room.</div>'}
+      ${done.length?`<h3 style="margin-top:6px">Done</h3>${done.map(taskLi).join('')}`:''}</section>`;
+  } else if(UI.roomTab==='walls'){
+    const w=r.walls||{};
+    body=`<section><p class="muted" style="margin:0;font-size:12.5px">Tap a box to cycle: not needed → needed → done. Front is the street side.</p>
+    <table class="walltbl"><thead><tr><th>Surface</th>${STAGES.map(s=>`<th>${s.short}</th>`).join('')}</tr></thead><tbody>
+    ${WALLS.map(wk=>`<tr><td>${wk.label}</td>${STAGES.map(sg=>{const v=(w[wk.key]||{})[sg.key]||'';return `<td><button type="button" class="wcell ${v}" style="--c:${sg.color}" data-wall="${wk.key}" data-stage="${sg.key}" aria-label="${wk.label} ${sg.label}: ${v||'not needed'}">${v==='done'?'✓':v==='need'?'●':''}</button></td>`}).join('')}</tr>`).join('')}
+    </tbody></table>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small" type="button" data-allwalls="shave">All walls need shaving</button><button class="btn small" type="button" data-allwalls="plaster">All need plaster</button><button class="btn small" type="button" data-allwalls="paint">All need paint</button></div></section>`;
+  } else if(UI.roomTab==='points'){
+    const ps=pointList().filter(q=>q.roomId===id);
+    body=`<section><p class="muted" style="margin:0;font-size:12.5px">Sockets, switches, light points and water or waste points for this room. Place them on the floor plan.</p>
+    <button class="btn" type="button" data-goplan="${r.level}">Open ${LEVELS[r.level].toLowerCase()} plan</button>
+    ${ps.length?ps.map(q=>{const ty=PT[q.type];return `<label class="task-li" style="grid-template-columns:auto auto 1fr"><input type="checkbox" data-ptdone="${q.id}" ${q.done?'checked':''}><span class="glyph" style="--c:${SEC[ty.sector].color}">${ty.g}</span><span>${esc(q.label||ty.label)}</span></label>`}).join(''):'<div class="empty">No points placed yet.</div>'}</section>`;
+  } else if(UI.roomTab==='vision'){
+    const imgs=r.images||[];
+    body=`<section><p class="muted" style="margin:0;font-size:12.5px">Keep renders of how the room should look, plan drawings and progress photos here.</p>
+    ${CAP.assets?`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><select class="inp" id="imgKind" aria-label="Image type"><option value="render">Render / design</option><option value="plan">Plan drawing</option><option value="photo">Progress photo</option></select>
+      <label class="btn" for="imgFile">Upload images</label><input id="imgFile" type="file" accept="image/*" multiple hidden></div>`:'<div class="empty">Uploads work on the published page.</div>'}
+    <div class="gallery">${imgs.map((im,i)=>`<figure><img src="${esc(im.url||('/_blob/'+im.id))}" alt="${esc(im.kind)} for ${esc(r.name)}" data-lightbox="${i}"><figcaption><span class="chip">${esc({render:'Render',plan:'Plan',photo:'Photo'}[im.kind]||im.kind)}</span><button class="btn ghost small" type="button" data-rmimg="${i}" aria-label="Remove image">Remove</button></figcaption></figure>`).join('')}</div>
+    ${imgs.length?'':'<div class="empty">No images yet.</div>'}</section>`;
+  } else if(UI.roomTab==='notes'){
+    body=`<section><label class="f" for="roomNotes">Notes, measurements, ideas<textarea id="roomNotes" rows="10">${esc(r.notes||'')}</textarea></label><span class="muted" style="font-size:12px">Saves when you click away.</span></section>`;
+  } else body=roomForm(id);
+  return `<section style="gap:6px"><button class="btn ghost small" type="button" id="railBack" style="align-self:flex-start;padding-left:0">← All rooms</button>
+    <h2 style="font-size:20px">${esc(r.name)}</h2><div class="muted" style="font-size:12.5px">${LEVELS[r.level]} · <span class="mono">${(+r.w).toFixed(2)} × ${(+r.d).toFixed(2)} m</span> · ${(r.w*r.d).toFixed(1)} m²</div>
+    <div style="display:flex;gap:8px;align-items:center"><div class="bar" style="flex:1"><i style="width:${p.pct||0}%"></i></div><span class="num mono" style="font-size:12px">${p.total?`${p.done}/${p.total}`:'nothing logged'}</span></div></section>
+    <div class="rtabs" role="tablist">${tabs.map(([k,l])=>`<button type="button" role="tab" data-rtab="${k}" aria-selected="${UI.roomTab===k}">${l}</button>`).join('')}</div>${body}`;
+}
+function roomForm(id){
+  const r=id?S.rooms[id]:{name:'',level:UI.level==='all'?0:Number(UI.level),x:0,y:0,w:3,d:3,outdoor:false};
+  return `<section><form id="roomForm" data-id="${id||''}" style="display:flex;flex-direction:column;gap:10px">
+    <label class="f" for="rfName">Room name<input id="rfName" value="${esc(r.name)}" required></label>
+    <label class="f" for="rfLevel">Level<select id="rfLevel">${LEVELS.map((l,i)=>`<option value="${i}" ${r.level===i?'selected':''}>${l}</option>`).join('')}</select></label>
+    <p class="muted" style="margin:0;font-size:12px">Position in metres from the front-left corner of the house (front = street side).</p>
+    <div class="grid2"><label class="f" for="rfX">From left (m)<input id="rfX" type="number" step="0.05" value="${r.x}"></label><label class="f" for="rfY">From front (m)<input id="rfY" type="number" step="0.05" value="${r.y}"></label>
+    <label class="f" for="rfW">Width (m)<input id="rfW" type="number" step="0.05" min="0.5" value="${r.w}"></label><label class="f" for="rfD">Depth (m)<input id="rfD" type="number" step="0.05" min="0.5" value="${r.d}"></label></div>
+    <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="rfOut" ${r.outdoor?'checked':''}> Outdoor space (yard, terrace)</label>
+    <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap"><button class="btn primary" type="submit">${id?'Save room':'Add room'}</button>
+    ${id?`<button class="btn danger" type="button" id="rfDel">${UI.confirmDel===id?'Click again to delete':'Delete room'}</button>`:''}</div></form></section>`;
+}
+function roomEditor(id){ return `<section style="gap:6px"><button class="btn ghost small" type="button" id="railBack" style="align-self:flex-start;padding-left:0">← Back</button><h2>${id?'Edit room':'New room'}</h2></section>${roomForm(id)}`; }
+
+/* ----- Tasks board ----- */
+function filteredTasks(){ const f=UI.tf; const q=f.q.trim().toLowerCase();
+  return taskList().filter(t=>(!f.sectors.length||f.sectors.includes(t.sector))&&(!f.room||t.roomId===f.room||(f.room==='none'&&!t.roomId))&&(!q||(t.title+' '+(t.notes||'')+' '+roomName(t.roomId)).toLowerCase().includes(q))); }
+function renderTasks(){
+  const ts=filteredTasks();
+  const card=t=>{const s=SEC[t.sector]||{color:'#999',label:t.sector};return `<div class="card" draggable="true" data-card="${t.id}" style="--c:${s.color}"><div>${esc(t.title)}</div><div class="meta"><span>${esc(s.label)}</span>${t.roomId?`<span>· ${esc(roomName(t.roomId))}</span>`:''}${t.priority==='high'&&t.status!=='done'?'<span class="pill high">High</span>':''}${t.due?`<span class="due${isOver(t)?' over':''}">· due ${fmtD(t.due)}</span>`:''}</div></div>`};
+  $('#main').innerHTML=`<div class="page">
+   <div class="toolbar"><input class="inp" id="tq" type="search" placeholder="Search tasks" value="${esc(UI.tf.q)}" style="width:220px" aria-label="Search tasks">
+    <select class="inp" id="troom" aria-label="Room"><option value="">All rooms</option><option value="none" ${UI.tf.room==='none'?'selected':''}>No room</option>${roomList().map(r=>`<option value="${r.id}" ${UI.tf.room===r.id?'selected':''}>${esc(r.name)} (${LEVELS[r.level].split(' ')[0]})</option>`).join('')}</select>
+    <div class="sector-filter">${SECTORS.map(s=>`<button type="button" data-tsec="${s.key}" aria-pressed="${UI.tf.sectors.includes(s.key)}"><i class="dot" style="background:${s.color}"></i>${esc(s.label)}</button>`).join('')}</div></div>
+   <div class="board">${STATUSES.map(st=>{let list=ts.filter(t=>t.status===st.key);
+     if(st.key==='done') list.sort((a,b)=>(b.doneAt||0)-(a.doneAt||0)); else list.sort((a,b)=>((b.priority==='high')-(a.priority==='high'))||(a.due||'9999').localeCompare(b.due||'9999'));
+     const shown=st.key==='done'&&!UI.showAllDone?list.slice(0,25):list;
+     return `<div class="col" data-col="${st.key}"><header><h2>${st.label}</h2><span class="muted num">${list.length}</span></header><div class="cards">${shown.map(card).join('')||'<div class="empty" style="padding:4px">Drop tasks here</div>'}${shown.length<list.length?`<button class="btn small" type="button" id="showDone">Show all ${list.length}</button>`:''}</div></div>`}).join('')}</div></div>`;
+}
+
+/* ----- Timeline ----- */
+function renderTimeline(){
+  const today=todayISO(); const prop=UI.tl.proposal;
+  const ts=taskList().map(t=>prop&&prop[t.id]?{...t,start:prop[t.id].start,due:prop[t.id].due,_p:true}:t);
+  const sched=ts.filter(t=>validISO(t.start)||validISO(t.due));
+  const unsched=ts.filter(t=>!validISO(t.start)&&!validISO(t.due)&&t.status!=='done');
+  const dates=[today]; sched.forEach(t=>{ if(validISO(t.start)) dates.push(t.start); if(validISO(t.due)) dates.push(t.due); }); if(validISO(S.meta.target)) dates.push(S.meta.target);
+  dates.sort(); let from=addDays(dates[0],-7); let to=addDays(dates[dates.length-1],21); if(daysBetween(from,to)<84) to=addDays(from,84);
+  const d0=toDate(from); const shift=(d0.getDay()+6)%7; from=addDays(from,-shift);
+  const days=daysBetween(from,to); const px=Math.max(7,Math.min(22,Math.floor(((($('#main').clientWidth||1000)-300)/days)))); const TW=days*px;
+  const xOf=s=>daysBetween(from,s)*px;
+  let wk=''; for(let i=0;i<=days;i+=7){ const ds=addDays(from,i); wk+=`<div class="wk" style="left:${i*px}px">${fmtD(ds)}</div>`; }
+  let grid=''; for(let i=0;i<=days;i+=7) grid+=`<div class="tl-grid" style="left:${240+i*px}px"></div>`;
+  let rows='';
+  for(const s of SECTORS){ const list=sched.filter(t=>t.sector===s.key).sort((a,b)=>(a.start||a.due).localeCompare(b.start||b.due)); if(!list.length) continue;
+    rows+=`<div class="tl-row grp"><div class="lab"><i class="dot" style="background:${s.color}"></i>${esc(s.label)}</div><div class="tl-track" style="width:${TW}px"></div></div>`;
+    for(const t of list){ const st=validISO(t.start)?t.start:addDays(t.due,-Math.max(1,Math.round(t.estDays||1))+1); const en=validISO(t.due)?t.due:addDays(st,Math.max(1,Math.round(t.estDays||1))-1);
+      const L=xOf(st), Wd=Math.max(px,(daysBetween(st,en)+1)*px);
+      rows+=`<div class="tl-row"><div class="lab" title="${esc(t.title)}">${esc(t.title)}${t.roomId?` <span class="muted">· ${esc(roomName(t.roomId))}</span>`:''}</div><div class="tl-track" style="width:${TW}px"><div class="tl-bar${t.status==='done'?' done':''}${t._p?' prop':''}" data-open-task="${t.id}" style="left:${L}px;width:${Wd}px;--c:${s.color}" title="${esc(t.title)}: ${fmtD(st)} – ${fmtD(en)}">${Wd>60?esc(t.title):''}</div></div></div>`; } }
+  const lines=`<div class="tl-line" style="left:${240+xOf(today)}px"><span>Today</span></div>`+(validISO(S.meta.target)?`<div class="tl-line target" style="left:${240+xOf(S.meta.target)}px"><span style="color:var(--bad)">Target</span></div>`:'');
+  $('#main').innerHTML=`<div class="page">
+   <div class="toolbar">
+     <label class="f" for="tlTarget">Target finish date<input id="tlTarget" type="date" value="${esc(S.meta.target||'')}"></label>
+     <label class="f" for="tlDays">Days a week on the house<input id="tlDays" type="number" min="1" max="7" value="${S.meta.daysPerWeek||3}" style="width:90px"></label>
+     ${CAP.sample?`<button class="btn primary" type="button" id="tlPlan" ${UI.tl.busy?'disabled':''} style="align-self:flex-end">${UI.tl.busy?'Planning…':'Plan my dates with AI'}</button>`:'<span class="muted" style="align-self:flex-end;font-size:12.5px">AI planning works on the published page.</span>'}
+     ${prop?`<span style="align-self:flex-end;display:flex;gap:6px"><button class="btn primary" type="button" id="tlApply">Apply ${Object.keys(prop).length} dates</button><button class="btn" type="button" id="tlDiscard">Discard</button></span>`:''}
+   </div>
+   ${UI.tl.note?`<div class="ai-out">${esc(UI.tl.note)}</div>`:''}
+   ${sched.length?`<div class="tl-wrap"><div class="tl" style="width:${240+TW}px">${grid}${lines}<div class="tl-head"><div class="lab muted">Task</div><div class="tl-track" style="width:${TW}px;height:28px">${wk}</div></div>${rows}</div></div>`:'<div class="empty">No dated tasks yet. Give tasks a start or due date, or let AI plan them against your target date.</div>'}
+   ${unsched.length?`<section><h2 style="font-size:15px;margin-bottom:6px">Not scheduled yet (${unsched.length})</h2><div style="display:flex;flex-wrap:wrap;gap:6px">${unsched.map(t=>`<button type="button" class="chip" data-open-task="${t.id}" style="cursor:pointer"><i class="dot" style="background:${SEC[t.sector]?.color||'#999'}"></i>${esc(t.title)}</button>`).join('')}</div></section>`:''}
+  </div>`;
+}
+
+/* ----- Plans ----- */
+function svgPoint(svg,e){ const pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
+function bindPlan(){
+  const svg=$('#planSvg'); if(!svg) return; let mv=null;
+  svg.addEventListener('pointerdown',e=>{ const g=e.target.closest('[data-pt]'); if(g&&UI.tool==='select'){ mv={id:g.dataset.pt,moved:false}; svg.setPointerCapture(e.pointerId); e.preventDefault(); } });
+  svg.addEventListener('pointermove',e=>{ if(!mv) return; const p=svgPoint(svg,e); mv.moved=true; mv.x=Math.round(p.x*20)/20; mv.y=Math.round(p.y*20)/20; const g=svg.querySelector(`[data-pt="${mv.id}"]`); if(g){ g.querySelector('circle').setAttribute('cx',mv.x); g.querySelector('circle').setAttribute('cy',mv.y); const t=g.querySelector('text'); t.setAttribute('x',mv.x); t.setAttribute('y',mv.y); } });
+  svg.addEventListener('pointerup',e=>{ if(!mv) return; const m=mv; mv=null;
+    if(m.moved){ const room=roomAt(m.x,m.y,UI.planLevel); const p=clone(S.points[m.id]); if(room){p.x=m.x;p.y=m.y;p.roomId=room.id;} UI.planSel=m.id; savePoint(m.id,p); }
+    else { UI.planSel=m.id; renderPlans(); } });
+  svg.addEventListener('click',e=>{ if(UI.tool==='select'){ if(!e.target.closest('[data-pt]')&&UI.planSel){UI.planSel=null;renderPlans();} return; }
+    const p=svgPoint(svg,e); const x=Math.round(p.x*20)/20, y=Math.round(p.y*20)/20; const room=roomAt(x,y,UI.planLevel);
+    if(!room){ toast('Click inside a room to place the point.'); return; }
+    const id=uid('p'); UI.planSel=id; savePoint(id,{type:UI.tool,roomId:room.id,x,y,label:'',done:false,created:Date.now()}); });
+}
+function roomAt(x,y,lv){ return roomList().find(r=>r.level===lv&&x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.d); }
+
+/* ----- Brain dump ----- */
+function renderDump(){
+  const rows=UI.dump.rows; const rs=roomList();
+  $('#main').innerHTML=`<div class="page dump">
+   <div><h2 style="font-size:22px">Brain dump</h2><p class="muted" style="margin:4px 0 0;max-width:65ch">Type or say everything on your mind about the house, in any order. Claude splits it into tasks, sorts each into a trade and a room, and you check them before they're added.</p></div>
+   <textarea id="dumpText" placeholder="e.g. Kitchen back wall needs the old plaster hacked off, then plaster. Need 4 double sockets in the kitchen and one for the fridge. Bedroom 2 needs painting, white ceiling. Order the shower screen for the main bathroom. Get a quote for the stair lighting strip…">${esc(UI.dump.text)}</textarea>
+   <div class="dump-actions">
+     ${CAP.sample?`<button class="btn primary" type="button" id="dumpGo" ${UI.dump.busy?'disabled':''}>${UI.dump.busy?'Splitting into tasks…':'Turn into tasks'}</button>`:'<span class="muted">AI task splitting works on the published page.</span>'}
+     ${CAP.dictation?`<button class="btn mic" type="button" id="micBtn" aria-pressed="${UI.listening?'true':'false'}">${UI.listening?'■ Stop':'🎙 Speak'}</button><span class="muted" id="partial" style="font-size:12.5px"></span>`:''}
+     ${UI.dump.text?'<button class="btn ghost" type="button" id="dumpClear">Clear</button>':''}
+   </div>
+   ${UI.dump.summary?`<div class="ai-out">${esc(UI.dump.summary)}</div>`:''}
+   ${rows?(rows.length?`<div class="tbl-wrap"><table class="prop-tbl"><thead><tr><th style="width:32px">Add</th><th>Task</th><th style="width:180px">Trade</th><th style="width:170px">Room</th><th style="width:120px">Status</th><th style="width:100px">Priority</th></tr></thead><tbody>
+     ${rows.map((r,i)=>`<tr><td><input type="checkbox" data-pr="${i}" data-f="inc" ${r.inc?'checked':''} aria-label="Include task ${i+1}"></td>
+       <td><input class="inp" type="text" data-pr="${i}" data-f="title" value="${esc(r.title)}" aria-label="Task title">${r.notes?`<div class="muted" style="font-size:12px;margin-top:3px">${esc(r.notes)}</div>`:''}</td>
+       <td><select class="inp" data-pr="${i}" data-f="sector" aria-label="Trade">${SECTORS.map(s=>`<option value="${s.key}" ${r.sector===s.key?'selected':''}>${esc(s.label)}</option>`).join('')}</select></td>
+       <td><select class="inp" data-pr="${i}" data-f="roomId" aria-label="Room"><option value="">No room</option>${rs.map(x=>`<option value="${x.id}" ${r.roomId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></td>
+       <td><select class="inp" data-pr="${i}" data-f="status" aria-label="Status">${STATUSES.map(s=>`<option value="${s.key}" ${r.status===s.key?'selected':''}>${s.label}</option>`).join('')}</select></td>
+       <td><select class="inp" data-pr="${i}" data-f="priority" aria-label="Priority">${['high','normal','low'].map(p=>`<option value="${p}" ${r.priority===p?'selected':''}>${p[0].toUpperCase()+p.slice(1)}</option>`).join('')}</select></td></tr>`).join('')}
+     </tbody></table></div>
+     <div class="dump-actions"><button class="btn primary" type="button" id="dumpAdd">Add ${rows.filter(r=>r.inc).length} tasks</button><button class="btn" type="button" id="dumpDiscard">Discard</button></div>`:'<div class="empty">No tasks found in that text.</div>'):''}
+  </div>`;
+}
+
+/* ---------- Task modal & lightbox ---------- */
+function openTask(id,preset={}){
+  const t=id?S.tasks[id]:{title:'',sector:preset.sector||'walls',roomId:preset.roomId||'',status:'todo',priority:'normal',start:'',due:'',estDays:1,notes:''};
+  const ov=document.createElement('div'); ov.className='overlay'; ov.innerHTML=`<form class="modal" id="taskForm">
+   <h2>${id?'Edit task':'New task'}</h2>
+   <label class="f" for="tfTitle">Task<input id="tfTitle" value="${esc(t.title)}" required></label>
+   <div class="grid2"><label class="f" for="tfSector">Trade<select id="tfSector">${SECTORS.map(s=>`<option value="${s.key}" ${t.sector===s.key?'selected':''}>${esc(s.label)}</option>`).join('')}</select></label>
+   <label class="f" for="tfRoom">Room<select id="tfRoom"><option value="">No room</option>${roomList().map(r=>`<option value="${r.id}" ${t.roomId===r.id?'selected':''}>${esc(r.name)} (${LEVELS[r.level].split(' ')[0]})</option>`).join('')}</select></label>
+   <label class="f" for="tfStatus">Status<select id="tfStatus">${STATUSES.map(s=>`<option value="${s.key}" ${t.status===s.key?'selected':''}>${s.label}</option>`).join('')}</select></label>
+   <label class="f" for="tfPri">Priority<select id="tfPri">${['high','normal','low'].map(p=>`<option value="${p}" ${t.priority===p?'selected':''}>${p[0].toUpperCase()+p.slice(1)}</option>`).join('')}</select></label></div>
+   <div class="grid3"><label class="f" for="tfStart">Start<input id="tfStart" type="date" value="${esc(t.start||'')}"></label><label class="f" for="tfDue">Due<input id="tfDue" type="date" value="${esc(t.due||'')}"></label><label class="f" for="tfEst">Days of work<input id="tfEst" type="number" min="0" step="0.5" value="${t.estDays??''}"></label></div>
+   <label class="f" for="tfNotes">Notes<textarea id="tfNotes" rows="3">${esc(t.notes||'')}</textarea></label>
+   <div class="row-end">${id?`<button class="btn danger" type="button" id="tfDel">Delete</button>`:'<span></span>'}<span style="display:flex;gap:8px"><button class="btn" type="button" id="tfCancel">Cancel</button><button class="btn primary" type="submit">Save</button></span></div></form>`;
+  document.body.appendChild(ov); ov.querySelector('#tfTitle').focus();
+  const close=()=>{ov.remove(); render();};
+  ov.addEventListener('click',e=>{ if(e.target===ov||e.target.id==='tfCancel') close(); if(e.target.id==='tfDel'){ if(e.target.dataset.sure){ store.del('tasks',id); close(); } else { e.target.dataset.sure='1'; e.target.textContent='Click again to delete'; } } });
+  ov.addEventListener('keydown',e=>{ if(e.key==='Escape') close(); });
+  ov.querySelector('form').addEventListener('submit',e=>{ e.preventDefault(); const g=s=>ov.querySelector(s).value;
+    const nt={...clone(t),title:g('#tfTitle').trim(),sector:g('#tfSector'),roomId:g('#tfRoom'),status:g('#tfStatus'),priority:g('#tfPri'),start:g('#tfStart'),due:g('#tfDue'),estDays:Number(g('#tfEst'))||0,notes:g('#tfNotes')};
+    if(!nt.title) return; if(!id) nt.created=Date.now(); if(nt.status==='done'&&t.status!=='done') nt.doneAt=Date.now();
+    ov.remove(); saveTask(id||uid('t'),nt); });
+}
+function lightbox(src,cap){ const ov=document.createElement('div'); ov.className='overlay lightbox'; ov.innerHTML=`<img src="${esc(src)}" alt="${esc(cap)}"><span>${esc(cap)} · click anywhere to close</span>`; ov.addEventListener('click',()=>ov.remove()); document.body.appendChild(ov); }
+function toggleDone(id,on){ const t=clone(S.tasks[id]); t.status=on?'done':'todo'; if(on) t.doneAt=Date.now(); saveTask(id,t); }
+
+/* ---------- AI ---------- */
+function aiErr(e){ if(e&&e.code==='not_granted'){CAP.sample=null; return 'AI access was declined for this page.';} if(e&&e.code==='rate_limited') return 'Too many AI requests just now. Wait a minute and try again.'; return 'The AI request failed. Try again.'; }
+function houseContext(){
+  return `Rooms (id | name | level):\n${roomList().map(r=>`${r.id} | ${r.name} | ${LEVELS[r.level]}${r.outdoor?' (outdoor)':''}`).join('\n')}\n\nTrades (key: label): ${SECTORS.map(s=>s.key+': '+s.label).join('; ')}`;
+}
+async function runDump(){
+  const text=($('#dumpText')?.value||'').trim(); UI.dump.text=text; if(!text){toast('Write or say something first.');return;}
+  UI.dump.busy=true; renderDump();
+  const existing=taskList().filter(t=>t.status!=='done').map(t=>'- '+t.title+(t.roomId?' ('+roomName(t.roomId)+')':'')).join('\n')||'(none)';
+  const prompt=`You help a homeowner in Malta finish renovating an old 3-level townhouse (ground floor, first floor, roof). Turn their brain dump into concrete tasks.
+
+${houseContext()}
+
+Open tasks already on the list (do not duplicate these):
+${existing}
+
+Rules:
+- One task = one trade in one room, small enough to finish in a few hours to a few days. Split compound sentences into separate tasks.
+- Start each title with a verb. Keep titles under 70 characters. Use the homeowner's own words for things.
+- sector must be one of the trade keys above. "Shaving" or "hacking off" old plaster, plastering, rendering, tiling, soffits and wall repairs are "walls". Sockets, switches, wiring, consumer unit, data and A/C are "electrical". Light fittings and lighting design are "lighting". Appliances, kitchen units and furniture are "furniture".
+- roomId must be one of the room ids above, or "" if no room fits or it is house-wide.
+- status: "done" if they say it is already done, "waiting" if it waits on a delivery, quote or someone else, "doing" if under way, otherwise "todo".
+- priority: "high" for broken things, safety, or things blocking other trades; "low" for nice-to-haves; else "normal".
+- estDays: your estimate of working days (number, can be 0.5).
+- notes: optional, under 120 characters, only details from the text worth keeping (sizes, quantities, colours, who to call).
+
+Return only JSON: {"tasks":[{"title":"","sector":"","roomId":"","status":"","priority":"","estDays":1,"notes":""}],"summary":"one short sentence on what you found"}
+
+Brain dump:
+"""${text}"""`;
+  try{
+    const out=await CAP.sample.json(prompt,{modelTier:'default'});
+    const list=Array.isArray(out?.tasks)?out.tasks:[];
+    UI.dump.rows=list.filter(t=>t&&t.title).map(t=>({inc:true,title:String(t.title).slice(0,140),sector:SEC[t.sector]?t.sector:'walls',roomId:S.rooms[t.roomId]?t.roomId:'',status:STAT[t.status]?t.status:'todo',priority:['high','normal','low'].includes(t.priority)?t.priority:'normal',estDays:Number(t.estDays)||1,notes:String(t.notes||'').slice(0,200)}));
+    UI.dump.summary=String(out?.summary||'');
+  }catch(e){ console.error(e); toast(aiErr(e)); }
+  UI.dump.busy=false; render();
+}
+async function runPlan(){
+  const open=taskList().filter(t=>t.status!=='done'); if(!open.length){toast('There are no open tasks to plan.');return;}
+  UI.tl.busy=true; UI.tl.note=''; renderTimeline();
+  const target=validISO(S.meta.target)?S.meta.target:'';
+  const prompt=`Plan start and due dates for the open renovation tasks of a 3-level townhouse in Malta. The homeowner does much of the work around another job.
+
+Today: ${todayISO()}
+Target finish date: ${target||'none set, so pick a realistic finish'}
+Days per week available for the house: ${S.meta.daysPerWeek||3}
+
+Trades: ${SECTORS.map(s=>s.key+'='+s.label).join(', ')}
+
+Open tasks (id | title | trade | room | status | priority | estimated working days | current start..due):
+${open.map(t=>`${t.id} | ${t.title} | ${t.sector} | ${roomName(t.roomId)||'-'} | ${t.status} | ${t.priority} | ${t.estDays||1} | ${t.start||'-'}..${t.due||'-'}`).join('\n')}
+
+Wall works logged per room (surface: stages still needed):
+${roomList().map(r=>{const w=r.walls||{};const need=WALLS.map(k=>{const st=w[k.key]||{};const n=STAGES.filter(s=>st[s.key]==='need').map(s=>s.short);return n.length?k.label+': '+n.join('>'):''}).filter(Boolean);return need.length?r.name+' — '+need.join('; '):''}).filter(Boolean).join('\n')||'(none logged)'}
+
+Sequencing rules for each room: shave off old plaster first; then first-fix electrical and plumbing (chasing, conduits, pipes); then plaster and render; then tiling; then second-fix (sockets, switches, sanitaryware); then painting; then light fittings, furniture and kitchen. Fix broken or high-priority things early. Tasks with status "waiting" depend on someone else: give them a short window soon. Spread work so that only about ${S.meta.daysPerWeek||3} working days per week are used in total, and keep the last task on or before the target date if there is one; if it cannot fit, say so in the note.
+
+Return only JSON: {"schedule":[{"id":"","start":"YYYY-MM-DD","due":"YYYY-MM-DD"}],"note":"two or three short sentences on the plan and any risk to the target date"}`;
+  try{
+    const out=await CAP.sample.json(prompt,{modelTier:'complex'});
+    const prop={}; for(const s of (out?.schedule||[])){ if(S.tasks[s.id]&&validISO(s.start)&&validISO(s.due)){ prop[s.id]=s.start<=s.due?{start:s.start,due:s.due}:{start:s.due,due:s.start}; } }
+    UI.tl.proposal=Object.keys(prop).length?prop:null; UI.tl.note=String(out?.note||'')+(Object.keys(prop).length?' Dashed bars are proposed dates. Apply them or discard.':'');
+  }catch(e){ console.error(e); toast(aiErr(e)); }
+  UI.tl.busy=false; render();
+}
+async function runAdvice(){
+  UI.advice.busy=true; UI.advice.text=''; renderRail();
+  const bs=bySector(); const ts=taskList();
+  const prompt=`You are a practical site foreman helping a homeowner finish an old 3-level townhouse in Malta that has dragged on for 3 years. Suggest what to do next.
+
+Progress by trade: ${SECTORS.map(s=>`${s.label} ${bs[s.key].done}/${bs[s.key].total}`).join('; ')}
+Open tasks: ${ts.filter(t=>t.status!=='done').map(t=>`${t.title} [${SEC[t.sector]?.label}${t.roomId?', '+roomName(t.roomId):''}${t.priority==='high'?', high':''}${t.status==='waiting'?', waiting':''}${t.due?', due '+t.due:''}]`).join('; ')||'none'}
+Recently done: ${ts.filter(t=>t.status==='done').sort((a,b)=>(b.doneAt||0)-(a.doneAt||0)).slice(0,8).map(t=>t.title).join('; ')||'none'}
+Target date: ${S.meta.target||'not set'}; today ${todayISO()}.
+
+Give exactly three numbered next actions, one line each, most useful first, in trade-sequence order (strip, first fix, plaster, second fix, paint, fit-out). Favour finishing one room completely to build momentum. If the list is thin, the last action should be to log what a specific room still needs. Plain text, no preamble.`;
+  try{ await CAP.sample(prompt,{modelTier:'quick',onText:({text})=>{UI.advice.text=text; const o=$('#adviceOut'); if(o) o.textContent=text;}}); }
+  catch(e){ UI.advice.text=aiErr(e); }
+  UI.advice.busy=false; renderRail();
+}
+
+/* ---------- Events ---------- */
+document.addEventListener('click',e=>{
+  const t=e.target;
+  const v=t.closest('#tabs button'); if(v){ go(v.dataset.view); return; }
+  const gv=t.closest('[data-goview]'); if(gv){ go(gv.dataset.goview); return; }
+  if(handleExtraClick(t,e)) return;
+  if(t.closest('#newTaskBtn')){ openTask(null,{roomId:UI.view==='house'&&UI.room?UI.room:''}); return; }
+  const ot=t.closest('[data-open-task]'); if(ot){ openTask(ot.dataset.openTask); return; }
+  const lb=t.closest('[data-level]'); if(lb){ UI.level=lb.dataset.level==='all'?'all':Number(lb.dataset.level); UI.zoom=null; renderHouse(); return; }
+  const ly=t.closest('[data-layer]'); if(ly){ UI.layer=ly.dataset.layer; renderHouse(); return; }
+  if(t.closest('#wallLow')){ UI.full=false; renderHouse(); return; }
+  if(t.closest('#wallFull')){ UI.full=true; renderHouse(); return; }
+  if(t.closest('#dim3')){ UI.dim='3d'; UI.zoom=null; renderHouse(); return; }
+  if(t.closest('#dim2')){ UI.dim='2d'; renderHouse(); return; }
+  if(t.closest('#railBack')){ if(UI.editRoom&&UI.editRoom!=='new'){UI.editRoom=null;} else {UI.editRoom=null; UI.room=null;} renderHouse(); return; }
+  const ro=t.closest('[data-room-open]'); if(ro){ openRoom(ro.dataset.roomOpen); return; }
+  const sr=t.closest('[data-sector]'); if(sr){ UI.tf.sectors=[sr.dataset.sector]; go('tasks'); return; }
+  if(t.closest('#addRoomBtn')){ UI.editRoom='new'; UI.room=null; renderHouse(); return; }
+  if(t.closest('#adviceBtn')){ runAdvice(); return; }
+  const rt=t.closest('[data-rtab]'); if(rt){ UI.roomTab=rt.dataset.rtab; UI.confirmDel=null; renderRail(); return; }
+  const wc=t.closest('[data-wall]'); if(wc){ const r=clone(S.rooms[UI.room]); r.walls=r.walls||{}; const w=r.walls[wc.dataset.wall]=r.walls[wc.dataset.wall]||{}; const cur=w[wc.dataset.stage]||''; const nx=cur===''?'need':cur==='need'?'done':''; if(nx) w[wc.dataset.stage]=nx; else delete w[wc.dataset.stage]; saveRoom(UI.room,r); return; }
+  const aw=t.closest('[data-allwalls]'); if(aw){ const r=clone(S.rooms[UI.room]); r.walls=r.walls||{}; for(const k of ['front','right','back','left']){ const w=r.walls[k]=r.walls[k]||{}; if(!w[aw.dataset.allwalls]) w[aw.dataset.allwalls]='need'; } saveRoom(UI.room,r); return; }
+  const gp=t.closest('[data-goplan]'); if(gp){ UI.planLevel=Number(gp.dataset.goplan); go('plans'); return; }
+  const li=t.closest('[data-lightbox]'); if(li){ const r=S.rooms[UI.room]; const im=r.images[Number(li.dataset.lightbox)]; lightbox(im.url||('/_blob/'+im.id),r.name); return; }
+  const ri=t.closest('[data-rmimg]'); if(ri){ const r=clone(S.rooms[UI.room]); r.images.splice(Number(ri.dataset.rmimg),1); saveRoom(UI.room,r); return; }
+  if(t.closest('#rfDel')){ const id=UI.room||UI.editRoom; if(UI.confirmDel===id){ store.del('rooms',id); taskList().filter(x=>x.roomId===id).forEach(x=>{const n=clone(S.tasks[x.id]); n.roomId=''; saveTask(x.id,n);}); pointList().filter(p=>p.roomId===id).forEach(p=>store.del('points',p.id)); itemList().filter(x=>x.roomId===id).forEach(x=>{const n=clone(S.items[x.id]); n.roomId=''; store.put('items',x.id,n);}); UI.room=null; UI.editRoom=null; UI.confirmDel=null; renderHouse(); } else { UI.confirmDel=id; renderRail(); } return; }
+  // tasks board
+  const ts=t.closest('[data-tsec]'); if(ts){ const k=ts.dataset.tsec; UI.tf.sectors=UI.tf.sectors.includes(k)?UI.tf.sectors.filter(x=>x!==k):[...UI.tf.sectors,k]; renderTasks(); return; }
+  const cd=t.closest('[data-card]'); if(cd){ openTask(cd.dataset.card); return; }
+  if(t.closest('#showDone')){ UI.showAllDone=true; renderTasks(); return; }
+  // timeline
+  if(t.closest('#tlPlan')){ runPlan(); return; }
+  if(t.closest('#tlApply')){ const p=UI.tl.proposal; UI.tl.proposal=null; UI.tl.note='Dates applied.'; for(const [id,d] of Object.entries(p)){ const n=clone(S.tasks[id]); if(!n) continue; n.start=d.start; n.due=d.due; saveTask(id,n); } return; }
+  if(t.closest('#tlDiscard')){ UI.tl.proposal=null; UI.tl.note=''; renderTimeline(); return; }
+  // plans
+  const pl=t.closest('[data-plevel]'); if(pl){ UI.planLevel=Number(pl.dataset.plevel); UI.planSel=null; renderPlans(); return; }
+  const tl=t.closest('[data-tool]'); if(tl){ UI.tool=tl.dataset.tool; UI.planSel=null; renderPlans(); return; }
+  const ps=t.closest('[data-ptsel]'); if(ps){ UI.planSel=ps.dataset.ptsel; renderPlans(); return; }
+  if(t.closest('#ptClose')){ UI.planSel=null; renderPlans(); return; }
+  if(t.closest('#ptDel')){ const id=UI.planSel; UI.planSel=null; store.del('points',id); return; }
+  // dump
+  if(t.closest('#dumpGo')){ runDump(); return; }
+  if(t.closest('#micBtn')){ const d=CAP.dictation; if(!d) return; if(UI.listening){ d.stop().catch(()=>{}); } else { UI.dump.text=$('#dumpText').value; d.start().catch(err=>{ if(err&&err.code==='not_granted'){CAP.dictation=null; renderDump(); toast('Microphone access was declined. You can still type.');} }); } return; }
+  if(t.closest('#dumpClear')){ UI.dump={text:'',rows:null,busy:false,summary:''}; renderDump(); return; }
+  if(t.closest('#dumpDiscard')){ UI.dump.rows=null; UI.dump.summary=''; renderDump(); return; }
+  if(t.closest('#dumpAdd')){ const add=UI.dump.rows.filter(r=>r.inc&&r.title.trim()); let n=0; for(const r of add){ const now=Date.now()+n++; saveTask(uid('t'),{title:r.title.trim(),sector:r.sector,roomId:r.roomId,status:r.status,priority:r.priority,start:'',due:'',estDays:r.estDays,notes:r.notes,created:now,...(r.status==='done'?{doneAt:now}:{})}); }
+    UI.dump={text:'',rows:null,busy:false,summary:''}; toast(`Added ${add.length} tasks.`); renderDump(); return; }
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(handleExtraChange(t)) return;
+  if(t.dataset.done){ toggleDone(t.dataset.done,t.checked); return; }
+  if(t.dataset.ptdone){ const p=clone(S.points[t.dataset.ptdone]); p.done=t.checked; savePoint(t.dataset.ptdone,p); return; }
+  if(t.id==='metaName'){ saveMeta({name:t.value.trim()||'My house'}); return; }
+  if(t.id==='roomNotes'){ const r=clone(S.rooms[UI.room]); r.notes=t.value; saveRoom(UI.room,r); return; }
+  if(t.id==='troom'){ UI.tf.room=t.value; renderTasks(); return; }
+  if(t.id==='tlTarget'){ saveMeta({target:t.value}); return; }
+  if(t.id==='tlDays'){ saveMeta({daysPerWeek:Math.max(1,Math.min(7,Number(t.value)||3))}); return; }
+  if(t.dataset.player){ UI.planLayers[t.dataset.player]=t.checked; renderPlans(); return; }
+  if(t.id==='ptLabel'){ const p=clone(S.points[UI.planSel]); p.label=t.value; savePoint(UI.planSel,p); return; }
+  if(t.id==='ptDone'){ const p=clone(S.points[UI.planSel]); p.done=t.checked; savePoint(UI.planSel,p); return; }
+  if(t.dataset.pr!=null){ const r=UI.dump.rows[Number(t.dataset.pr)]; const f=t.dataset.f; r[f]=f==='inc'?t.checked:t.value; if(f==='inc'){ const b=$('#dumpAdd'); if(b) b.textContent=`Add ${UI.dump.rows.filter(x=>x.inc).length} tasks`; } return; }
+  if(t.id==='imgFile'){ uploadImages([...t.files], $('#imgKind').value); return; }
+});
+document.addEventListener('input',e=>{ const t=e.target; if(t.id==='tq'){ UI.tf.q=t.value; clearTimeout(window._tq); window._tq=setTimeout(()=>{ const pos=t.selectionStart; renderTasksKeepFocus(pos); },250); } if(t.id==='dumpText'){ UI.dump.text=t.value; } });
+function renderTasksKeepFocus(pos){ const a=document.activeElement; a&&a.blur(); renderTasks(); const n=$('#tq'); if(n){ n.focus(); try{n.setSelectionRange(pos,pos);}catch(_){} } }
+document.addEventListener('submit',e=>{
+  if(e.target.id==='quickAdd'){ e.preventDefault(); const title=$('#qaTitle').value.trim(); if(!title) return; const sec=$('#qaSector').value; UI.lastSector=sec; $('#qaTitle').blur(); saveTask(uid('t'),{title,sector:sec,roomId:UI.room,status:'todo',priority:'normal',start:'',due:'',estDays:1,notes:'',created:Date.now()}); return; }
+  if(e.target.id==='roomForm'){ e.preventDefault(); const id=e.target.dataset.id; const g=s=>$(s).value; const base=id?clone(S.rooms[id]):{notes:'',walls:{},images:[]};
+    const r={...base,name:g('#rfName').trim()||'Room',level:Number(g('#rfLevel')),x:Number(g('#rfX'))||0,y:Number(g('#rfY'))||0,w:Math.max(.5,Number(g('#rfW'))||1),d:Math.max(.5,Number(g('#rfD'))||1),outdoor:$('#rfOut').checked};
+    const nid=id||uid('r'); document.activeElement&&document.activeElement.blur(); UI.editRoom=null; UI.room=nid; UI.roomTab=id?'edit':'tasks'; saveRoom(nid,r); toast(id?'Room saved.':'Room added.'); }
+});
+// drag & drop on board
+document.addEventListener('dragstart',e=>{ const c=e.target.closest&&e.target.closest('[data-card]'); if(!c) return; e.dataTransfer.setData('text/plain',c.dataset.card); e.dataTransfer.effectAllowed='move'; c.classList.add('dragging'); });
+document.addEventListener('dragend',e=>{ document.querySelectorAll('.dragging,.col.over').forEach(x=>x.classList.remove('dragging','over')); });
+document.addEventListener('dragover',e=>{ const col=e.target.closest&&e.target.closest('[data-col]'); if(!col) return; e.preventDefault(); document.querySelectorAll('.col.over').forEach(x=>x!==col&&x.classList.remove('over')); col.classList.add('over'); });
+document.addEventListener('drop',e=>{ const col=e.target.closest&&e.target.closest('[data-col]'); if(!col) return; e.preventDefault(); const id=e.dataTransfer.getData('text/plain'); if(!S.tasks[id]) return; const n=clone(S.tasks[id]); if(n.status===col.dataset.col) return; n.status=col.dataset.col; if(n.status==='done') n.doneAt=Date.now(); saveTask(id,n); });
+
+async function uploadImages(files,kind){
+  if(!CAP.assets||!files.length) return; const id=UI.room; toast(`Uploading ${files.length} image${files.length>1?'s':''}…`);
+  const added=[];
+  for(const f of files){ try{ const a=await CAP.assets.upload(f); added.push({id:a.id,url:a.url,kind,caption:f.name,added:Date.now()}); }catch(e){ console.error(e); toast('Could not upload '+f.name+'. Images must be under 20 MB.'); } }
+  if(added.length){ const r=clone(S.rooms[id]); r.images=[...(r.images||[]),...added]; saveRoom(id,r); toast(`Uploaded ${added.length}.`); }
+}
+
+/* ---------- Shared plan drawing (metres) ---------- */
+function wallSeg(r,k){ switch(k){ case 'front':return{p:[r.x,r.y],d:[1,0],n:[0,1],L:r.w}; case 'back':return{p:[r.x,r.y+r.d],d:[1,0],n:[0,-1],L:r.w}; case 'left':return{p:[r.x,r.y],d:[0,1],n:[1,0],L:r.d}; case 'right':return{p:[r.x+r.w,r.y],d:[0,1],n:[-1,0],L:r.d}; } return null; }
+function openingGeom(r,o){
+  const s=wallSeg(r,o.wall); if(!s||s.L<=0) return null;
+  const off=Math.max(0,Math.min(s.L-.1,+o.offset||0)); const w=Math.max(.1,Math.min(s.L-off,+o.width||.8));
+  const p0=[s.p[0]+s.d[0]*off,s.p[1]+s.d[1]*off], p1=[p0[0]+s.d[0]*w,p0[1]+s.d[1]*w];
+  const hinge=o.hinge==='end'?p1:p0, other=o.hinge==='end'?p0:p1; const leaf=[hinge[0]+s.n[0]*w,hinge[1]+s.n[1]*w];
+  const a1=Math.atan2(leaf[1]-hinge[1],leaf[0]-hinge[0]); let a2=Math.atan2(other[1]-hinge[1],other[0]-hinge[0]); let da=a2-a1; while(da>Math.PI) da-=2*Math.PI; while(da<-Math.PI) da+=2*Math.PI;
+  const arc=[]; for(let i=0;i<=12;i++){ const a=a1+da*i/12; arc.push([hinge[0]+Math.cos(a)*w,hinge[1]+Math.sin(a)*w]); }
+  return {p0,p1,hinge,leaf,arc,n:s.n,d:s.d,w};
+}
+const WALL_SEGS=r=>({front:[r.x,r.y,r.x+r.w,r.y],right:[r.x+r.w,r.y,r.x+r.w,r.y+r.d],back:[r.x,r.y+r.d,r.x+r.w,r.y+r.d],left:[r.x,r.y,r.x,r.y+r.d]});
+function insetSeg(k,s,i){ let [x1,y1,x2,y2]=s; if(k==='front'){y1+=i;y2+=i;} if(k==='back'){y1-=i;y2-=i;} if(k==='left'){x1+=i;x2+=i;} if(k==='right'){x1-=i;x2-=i;} return [x1,y1,x2,y2]; }
+function planG(lv,o={}){
+  const rs=roomList().filter(r=>r.level===lv); const b=houseBounds(); let g='';
+  const fw=+S.meta.width||0, fd=+S.meta.depth||0;
+  if(fw>0&&fd>0) g+=`<rect x="0" y="0" width="${fw}" height="${fd}" fill="none" stroke="var(--muted)" stroke-width=".03" stroke-dasharray=".18 .12" pointer-events="none"/>`;
+  for(const r of rs){ let fill=r.outdoor?'var(--floor-out)':'var(--floor)'; if(o.fill==='progress'){ const p=progress(items({room:r.id})).pct; if(p!=null) fill=pctColor(p,.85); }
+    const click=o.click?` data-${o.click}="${r.id}"`:''; const sel=o.sel===r.id?' stroke="var(--accent)" stroke-width=".1"':' stroke="none"';
+    g+=`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.d}" fill="${fill}"${sel}${click}><title>${esc(r.name)}</title></rect>`; }
+  for(const r of rs){ for(const [k,s] of Object.entries(WALL_SEGS(r))){ const ws=o.walls?wallState((r.walls||{})[k]):null; const [x1,y1,x2,y2]=insetSeg(k,s,.06);
+      g+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${ws?ws.color:'var(--wall-top)'}" stroke-width="${ws?.12:.07}" stroke-linecap="square" pointer-events="none"/>`; } }
+  for(const r of rs){ for(const op of (r.openings||[])){ const q=openingGeom(r,op); if(!q) continue; const nx=q.n[0]*.17, ny=q.n[1]*.17;
+      g+=`<line x1="${q.p0[0]}" y1="${q.p0[1]}" x2="${q.p1[0]}" y2="${q.p1[1]}" stroke="var(--panel)" stroke-width=".34" pointer-events="none"/>`;
+      if(op.type==='door'){ g+=`<line x1="${q.hinge[0]}" y1="${q.hinge[1]}" x2="${q.leaf[0]}" y2="${q.leaf[1]}" stroke="var(--ink)" stroke-width=".035" pointer-events="none"/><polyline points="${q.arc.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(--muted)" stroke-width=".02" stroke-dasharray=".06 .04" pointer-events="none"/>`; }
+      else if(op.type==='window'){ for(const f of [-.07,0,.07]) g+=`<line x1="${q.p0[0]+q.n[0]*f}" y1="${q.p0[1]+q.n[1]*f}" x2="${q.p1[0]+q.n[0]*f}" y2="${q.p1[1]+q.n[1]*f}" stroke="var(--accent)" stroke-width=".025" pointer-events="none"/>`; }
+      for(const p of [q.p0,q.p1]) g+=`<line x1="${p[0]-nx}" y1="${p[1]-ny}" x2="${p[0]+nx}" y2="${p[1]+ny}" stroke="var(--wall-top)" stroke-width=".05" pointer-events="none"/>`; } }
+  if(o.labels!==false) for(const r of rs){ const fs=Math.max(.1,Math.min(.34,r.d/3,r.w*.9/(Math.max(4,r.name.length)*.55))); const p=o.fill==='progress'?progress(items({room:r.id})).pct:null;
+    g+=`<text x="${r.x+r.w/2}" y="${r.y+r.d/2}" text-anchor="middle" dominant-baseline="middle" font-family="IBM Plex Sans Condensed, sans-serif" font-weight="600" font-size="${fs}" fill="var(--ink)" pointer-events="none">${esc(r.name)}</text>`;
+    g+=`<text x="${r.x+r.w/2}" y="${r.y+r.d/2+fs*1.15}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="${fs*.62}" fill="var(--muted)" pointer-events="none">${p!=null?p+'% · ':''}${(+r.w).toFixed(2)} × ${(+r.d).toFixed(2)}</text>`; }
+  if(o.dims){ const W=b.x1-b.x0, D=b.y1-b.y0;
+    g+=`<g stroke="var(--muted)" stroke-width="0.02" fill="var(--muted)" font-family="IBM Plex Mono, monospace" font-size="0.26" pointer-events="none">
+     <line x1="${b.x0}" y1="${b.y0-.7}" x2="${b.x1}" y2="${b.y0-.7}"/><line x1="${b.x0}" y1="${b.y0-.85}" x2="${b.x0}" y2="${b.y0-.55}"/><line x1="${b.x1}" y1="${b.y0-.85}" x2="${b.x1}" y2="${b.y0-.55}"/>
+     <text x="${b.x0+W/2}" y="${b.y0-.82}" text-anchor="middle" stroke="none">${W.toFixed(2)} m · street</text>
+     <line x1="${b.x0-.7}" y1="${b.y0}" x2="${b.x0-.7}" y2="${b.y1}"/><line x1="${b.x0-.85}" y1="${b.y0}" x2="${b.x0-.55}" y2="${b.y0}"/><line x1="${b.x0-.85}" y1="${b.y1}" x2="${b.x0-.55}" y2="${b.y1}"/>
+     <text x="${b.x0-.82}" y="${b.y0+D/2}" text-anchor="middle" stroke="none" transform="rotate(-90 ${b.x0-.82} ${b.y0+D/2})">${D.toFixed(2)} m</text></g>`; }
+  if(o.pts&&o.pts.length){ for(const p of pointList()){ const ty=PT[p.type]; const r=S.rooms[p.roomId]; if(!ty||!r||r.level!==lv||!o.pts.includes(ty.sector)) continue; const c=SEC[ty.sector].color; const sel=o.ptsel===p.id;
+    g+=`<g data-pt="${p.id}" style="cursor:pointer"><circle cx="${p.x}" cy="${p.y}" r="${sel?.26:.2}" fill="${p.done?c:'var(--panel)'}" stroke="${sel?'var(--accent)':c}" stroke-width="${sel?.07:.05}"/><text x="${p.x}" y="${p.y+.004}" text-anchor="middle" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-weight="700" font-size="${ty.g.length>1?.13:.17}" fill="${p.done?'#fff':c}" pointer-events="none">${ty.g}</text><title>${esc(p.label||ty.label)}${p.done?' (done)':''}</title></g>`; } }
+  return g;
+}
+function build2D(){
+  const box=$('#plan2d'); if(!box) return; const b=houseBounds(); const W=b.x1-b.x0, D=b.y1-b.y0; const gap=2.2;
+  const levels=UI.level==='all'?[0,1,2]:[Number(UI.level)];
+  const pts=UI.layer==='electrical'?['electrical','lighting']:UI.layer==='plumbing'?['plumbing']:[];
+  let g=''; levels.forEach((lv,i)=>{ const dx=i*(W+gap);
+    g+=`<g transform="translate(${dx} 0)"><text x="${b.x0+W/2}" y="${b.y0-.45}" text-anchor="middle" font-family="IBM Plex Sans Condensed, sans-serif" font-weight="700" font-size=".34" letter-spacing=".04" fill="var(--muted)">${LEVELS[lv].toUpperCase()}</text>${planG(lv,{fill:UI.layer==='progress'?'progress':'plain',walls:UI.layer==='walls',pts,click:'room2',sel:UI.room})}</g>`; });
+  const vb=[b.x0-.4,b.y0-1,levels.length*W+(levels.length-1)*gap+.8,D+1.4];
+  box.innerHTML=`<svg viewBox="${vb.join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Floor plans">${g}</svg>`;
+}
+
+/* ----- Plans (rewritten) ----- */
+function renderPlans(){
+  const lv=UI.planLevel; const rs=roomList().filter(r=>r.level===lv); const b=houseBounds(); const pad=1.4;
+  const vb=[b.x0-pad,b.y0-pad,(b.x1-b.x0)+pad*2,(b.y1-b.y0)+pad*2];
+  const pts=pointList().filter(p=>{const r=S.rooms[p.roomId]; return r&&r.level===lv&&PT[p.type];});
+  const sec=[...(UI.planLayers.electrical?['electrical','lighting']:[]),...(UI.planLayers.plumbing?['plumbing']:[])];
+  const svg=planG(lv,{fill:'plain',walls:UI.planLayers.walls,pts:sec,dims:true,ptsel:UI.planSel});
+  const selP=UI.planSel&&S.points[UI.planSel]?{id:UI.planSel,...S.points[UI.planSel]}:null;
+  const counts=s=>{const l=pts.filter(p=>s.includes(PT[p.type].sector));return `${l.filter(p=>p.done).length}/${l.length}`};
+  const H3=t=>`<h3 style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">${t}</h3>`;
+  $('#main').innerHTML=`<section class="plans">
+   <aside>
+     <div>${H3('Level')}<div class="seg">${LEVELS.map((l,i)=>`<button type="button" data-plevel="${i}" aria-pressed="${lv===i}">${l.split(' ')[0]}</button>`).join('')}</div></div>
+     <div>${H3('Show')}${[['walls','Wall works'],['electrical','Electrical & lighting'],['plumbing','Plumbing & gas']].map(([k,l])=>`<label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:2px 0"><input type="checkbox" data-player="${k}" ${UI.planLayers[k]?'checked':''}>${l}</label>`).join('')}</div>
+     <div>${H3('Place a point')}<div class="tools"><button type="button" data-tool="select" aria-pressed="${UI.tool==='select'}"><span class="glyph" style="--c:var(--muted)">↖</span>Select / move</button>
+     ${PTYPES.map(p=>`<button type="button" data-tool="${p.key}" aria-pressed="${UI.tool===p.key}"><span class="glyph" style="--c:${SEC[p.sector].color}">${p.g}</span>${p.label}</button>`).join('')}</div></div>
+     <div class="export">${H3('Export PDF drawings')}
+       ${[['arch','Architectural'],['elec','Electrical & lighting'],['plumb','Plumbing & gas'],['walls','Wall works']].map(([k,l])=>`<label><input type="checkbox" data-expd="${k}" ${UI.exp.disc[k]?'checked':''}>${l}</label>`).join('')}
+       <div class="muted" style="font-size:11.5px;margin-top:4px">Levels</div>
+       ${LEVELS.map((l,i)=>`<label><input type="checkbox" data-expl="${i}" ${UI.exp.levels[i]?'checked':''}>${l}</label>`).join('')}
+       <button class="btn primary" type="button" id="expBtn" ${UI.exp.busy?'disabled':''}>${UI.exp.busy?'Building PDF…':'Download PDF (A3)'}</button>
+       <span class="muted" style="font-size:11.5px">One A3 sheet per drawing and level, drawn to a standard scale with a title block and schedule.</span></div>
+   </aside>
+   <div class="plan-stage"><svg id="planSvg" class="${UI.tool!=='select'?'placing':''}" viewBox="${vb.join(' ')}" width="${vb[2]*48}" height="${vb[3]*48}" role="img" aria-label="${LEVELS[lv]} plan">${svg}</svg></div>
+   <aside class="right">
+     ${selP?`<div style="display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px"><div style="display:flex;gap:8px;align-items:center"><span class="glyph" style="--c:${SEC[PT[selP.type].sector].color}">${PT[selP.type].g}</span><b>${PT[selP.type].label}</b><span class="muted">· ${esc(roomName(selP.roomId))}</span></div>
+       <label class="f" for="ptLabel">Label<input id="ptLabel" value="${esc(selP.label||'')}" placeholder="e.g. Double socket by bed, 30 cm"></label>
+       <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="ptDone" ${selP.done?'checked':''}> Installed / done</label>
+       <div style="display:flex;justify-content:space-between"><button class="btn small" type="button" id="ptClose">Close</button><button class="btn small danger" type="button" id="ptDel">Delete point</button></div></div>`:
+       `<p class="muted" style="font-size:12.5px;margin:0">${UI.tool==='select'?'Pick a point type on the left, then click inside a room to place it. Click a point to edit it, or drag it to move it.':'Click inside a room to place a '+PT[UI.tool].label.toLowerCase()+'.'}</p>`}
+     <div>${H3(LEVELS[lv])}<div class="muted num" style="font-size:12.5px">Electrical & lighting done ${counts(['electrical','lighting'])} · Plumbing done ${counts(['plumbing'])}</div></div>
+     <div class="pt-list">${rs.map(r=>{const l=pts.filter(p=>p.roomId===r.id);if(!l.length)return'';return `<div class="muted" style="font:600 11px var(--display);letter-spacing:.06em;text-transform:uppercase;margin-top:6px">${esc(r.name)}</div>`+l.map(p=>{const ty=PT[p.type];return `<div class="pt-row${UI.planSel===p.id?' sel':''}" data-ptsel="${p.id}"><span class="glyph" style="--c:${SEC[ty.sector].color};${p.done?`background:${SEC[ty.sector].color};color:#fff`:''}">${ty.g}</span>${esc(p.label||ty.label)}</div>`}).join('')}).join('')||'<div class="empty">No points on this level yet.</div>'}</div>
+     ${UI.planLayers.walls?`<div>${H3('Wall colours')}${STAGES.map(s=>`<div style="display:flex;gap:6px;align-items:center;font-size:12.5px"><i style="width:18px;height:4px;background:${s.color};display:inline-block"></i>Needs ${s.label.toLowerCase()}</div>`).join('')}<div style="display:flex;gap:6px;align-items:center;font-size:12.5px"><i style="width:18px;height:4px;background:var(--good);display:inline-block"></i>Finished</div></div>`:''}
+   </aside></section>`;
+  bindPlan();
+}
+
+/* ---------- Setup ---------- */
+function moveRoom(id,patch){
+  const r=clone(S.rooms[id]); const dx=(patch.x!=null?patch.x:r.x)-r.x, dy=(patch.y!=null?patch.y:r.y)-r.y;
+  Object.assign(r,patch); saveRoom(id,r);
+  if((dx||dy)&&patch.level==null) pointList().filter(p=>p.roomId===id).forEach(p=>{ const n=clone(S.points[p.id]); n.x=Math.round((n.x+dx)*100)/100; n.y=Math.round((n.y+dy)*100)/100; savePoint(p.id,n); });
+}
+function setupWarnings(lv){
+  const rs=roomList().filter(r=>r.level===lv); const w=[]; const fw=+S.meta.width||0, fd=+S.meta.depth||0;
+  for(let i=0;i<rs.length;i++) for(let j=i+1;j<rs.length;j++){ const a=rs[i],c=rs[j]; const ox=Math.min(a.x+a.w,c.x+c.w)-Math.max(a.x,c.x), oy=Math.min(a.y+a.d,c.y+c.d)-Math.max(a.y,c.y); if(ox>.02&&oy>.02) w.push(`${a.name} and ${c.name} overlap by ${ox.toFixed(2)} × ${oy.toFixed(2)} m.`); }
+  if(fw>0&&fd>0) for(const r of rs){ if(r.x<-.01||r.y<-.01||r.x+r.w>fw+.01||r.y+r.d>fd+.01) w.push(`${r.name} sticks out of the ${fw.toFixed(2)} × ${fd.toFixed(2)} m footprint.`); }
+  for(const r of rs) for(const o of (r.openings||[])){ const s=wallSeg(r,o.wall); if(s&&(+o.offset||0)+(+o.width||0)>s.L+.01) w.push(`A ${o.type} in ${r.name} runs past the end of the ${o.wall} wall (${s.L.toFixed(2)} m).`); }
+  return w;
+}
+function renderSetup(){
+  const lv=UI.setupLevel; const rs=roomList().filter(r=>r.level===lv); const m=S.meta; const hs=m.heights||[2.9,2.9,2.4];
+  if(UI.setupSel&&(!S.rooms[UI.setupSel]||S.rooms[UI.setupSel].level!==lv)) UI.setupSel=null;
+  const sel=UI.setupSel?{id:UI.setupSel,...S.rooms[UI.setupSel]}:null;
+  const warns=setupWarnings(lv); const b=houseBounds(); const pad=1.3; const vb=[b.x0-pad,b.y0-pad,(b.x1-b.x0)+pad*2,(b.y1-b.y0)+pad*2];
+  const wallLen=(r,k)=>(k==='front'||k==='back')?r.w:r.d;
+  $('#main').innerHTML=`<section class="setup"><div class="form">
+   <div><h2 style="font-size:22px">Setup your house</h2><p class="muted" style="margin:4px 0 0;font-size:13px">Enter your measurements once. Everything else (the 3D model, plans, PDFs and room progress) is drawn from this, and you can come back to adjust it any time. Measure in metres from the <b>front-left corner</b> of the house, with the front being the street side.</p></div>
+   <section><span class="step">STEP 1</span><h2>The house</h2>
+     <div class="grid2"><label class="f" for="suName">House name<input id="suName" value="${esc(m.name||'')}"></label><span></span>
+     <label class="f" for="suW">Frontage width (m)<input id="suW" type="number" step="0.01" min="0" value="${m.width||''}" placeholder="e.g. 6.10"></label>
+     <label class="f" for="suD">Depth front to back (m)<input id="suD" type="number" step="0.01" min="0" value="${m.depth||''}" placeholder="e.g. 14.30"></label></div>
+     <div class="grid3">${LEVELS.map((l,i)=>`<label class="f" for="suH${i}">${l} ceiling (m)<input id="suH${i}" data-height="${i}" type="number" step="0.01" min="1" value="${hs[i]||''}"></label>`).join('')}</div>
+   </section>
+   <section><span class="step">STEP 2</span><h2>Rooms</h2>
+     <div class="seg">${LEVELS.map((l,i)=>`<button type="button" data-slevel="${i}" aria-pressed="${lv===i}">${l} (${roomList().filter(r=>r.level===i).length})</button>`).join('')}</div>
+     <div class="tbl-wrap"><table class="rtbl"><thead><tr><th>Room</th><th>From left</th><th>From front</th><th>Width</th><th>Depth</th><th title="Outdoor">Out</th><th></th></tr></thead><tbody>
+     ${rs.map(r=>`<tr class="${UI.setupSel===r.id?'sel':''}"><td><input class="inp" type="text" data-rf="name" data-rid="${r.id}" value="${esc(r.name)}" aria-label="Room name"></td>
+       ${['x','y','w','d'].map(f=>`<td><input class="inp" type="number" step="0.01" data-rf="${f}" data-rid="${r.id}" value="${r[f]}" aria-label="${esc(r.name)} ${f}"></td>`).join('')}
+       <td><input type="checkbox" data-rf="outdoor" data-rid="${r.id}" ${r.outdoor?'checked':''} aria-label="${esc(r.name)} outdoor"></td>
+       <td style="white-space:nowrap"><button class="btn small" type="button" data-ssel="${r.id}" title="Doors and windows">Openings${(r.openings||[]).length?` (${r.openings.length})`:''}</button> <button class="btn small ghost" type="button" data-rdel="${r.id}">${UI.confirmDel===r.id?'Confirm':'✕'}</button></td></tr>`).join('')}
+     </tbody></table></div>
+     ${rs.length?'':'<div class="empty">No rooms on this level yet.</div>'}
+     <div><button class="btn" type="button" id="suAddRoom">+ Add room on ${LEVELS[lv].toLowerCase()}</button></div>
+     ${warns.length?`<ul class="warn-list">${warns.map(w=>`<li>${esc(w)}</li>`).join('')}</ul>`:rs.length?'<div class="okline">No overlaps found on this level.</div>':''}
+   </section>
+   <section><span class="step">STEP 3</span><h2>Doors & windows${sel?' · '+esc(sel.name):''}</h2>
+     ${sel?`<p class="muted" style="margin:0;font-size:12.5px">Offset is measured along the wall: from the left end for front and back walls, from the front end for left and right walls. This room's front/back walls are ${sel.w.toFixed(2)} m, left/right walls ${sel.d.toFixed(2)} m.</p>
+     <table class="rtbl"><thead><tr><th>Wall</th><th>Type</th><th>Offset</th><th>Width</th><th>Hinge</th><th></th></tr></thead><tbody>
+     ${(sel.openings||[]).map((o,i)=>`<tr><td><select class="inp" data-of="wall" data-oi="${i}" aria-label="Wall">${['front','right','back','left'].map(k=>`<option value="${k}" ${o.wall===k?'selected':''}>${k[0].toUpperCase()+k.slice(1)}</option>`).join('')}</select></td>
+       <td><select class="inp" data-of="type" data-oi="${i}" aria-label="Type">${OPEN_TYPES.map(t=>`<option value="${t.key}" ${o.type===t.key?'selected':''}>${t.label}</option>`).join('')}</select></td>
+       <td><input class="inp" type="number" step="0.01" min="0" data-of="offset" data-oi="${i}" value="${o.offset}" aria-label="Offset"></td>
+       <td><input class="inp" type="number" step="0.01" min="0.1" data-of="width" data-oi="${i}" value="${o.width}" aria-label="Width"></td>
+       <td>${o.type==='door'?`<select class="inp" data-of="hinge" data-oi="${i}" aria-label="Hinge side"><option value="start" ${o.hinge!=='end'?'selected':''}>Start</option><option value="end" ${o.hinge==='end'?'selected':''}>End</option></select>`:''}</td>
+       <td><button class="btn small ghost" type="button" data-odel="${i}" aria-label="Remove">✕</button></td></tr>`).join('')}</tbody></table>
+     <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small" type="button" data-oadd="door">+ Door</button><button class="btn small" type="button" data-oadd="window">+ Window</button><button class="btn small" type="button" data-oadd="opening">+ Opening</button></div>`
+     :'<p class="muted" style="margin:0;font-size:12.5px">Choose a room with its Openings button, or click it on the plan.</p>'}
+   </section>
+   <section><span class="step">STEP 4 · OPTIONAL</span><h2>Import or export rooms as CSV</h2>
+     <p class="muted" style="margin:0;font-size:12.5px">Handy if you'd rather measure into a spreadsheet. Columns: <span class="mono">level,name,from_left,from_front,width,depth,outdoor</span>. Level is G, F or R. Rooms are matched by level and name, so re-importing updates sizes and keeps their tasks.</p>
+     <textarea class="csv" id="csvText" placeholder="level,name,from_left,from_front,width,depth,outdoor&#10;G,Living room,0,0,4.25,5.10,no">${esc(UI.csv.text)}</textarea>
+     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+       <label class="btn small" for="csvFile">Load .csv file</label><input id="csvFile" type="file" accept=".csv,text/csv,text/plain" hidden>
+       <button class="btn small" type="button" id="csvCur">Fill with current rooms</button>
+       ${CAP.downloads?'<button class="btn small" type="button" id="csvDl">Download current rooms (.csv)</button>':''}
+       <label style="display:flex;gap:6px;align-items:center;font-size:12.5px"><input type="checkbox" id="csvPrune" ${UI.csv.prune?'checked':''}> Remove rooms not in the file</label>
+       <button class="btn primary small" type="button" id="csvGo">Import</button></div>
+     ${UI.csv.msg?`<div class="${UI.csv.err?'warn-list':'okline'}" style="padding:0">${esc(UI.csv.msg)}</div>`:''}
+   </section>
+   <section><span class="step">BACKUP</span><h2>Back up or restore all data</h2>
+     <p class="muted" style="margin:0;font-size:12.5px">Saves every room, door and window, task, plan point, wall stage, quote and setting to one .json file. Keep it in your private house-hub-data repo. Uploaded photos and quote files stay online and are linked from the backup, not copied into it.</p>
+     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${CAP.downloads?'<button class="btn small" type="button" id="bkSave">Download backup (.json)</button>':'<span class="muted" style="font-size:12.5px">Backups download on the published page.</span>'}
+       <button class="btn small" type="button" id="bkCopy">Copy backup to clipboard</button>
+       <label class="btn small" for="bkFile">Restore from backup…</label><input id="bkFile" type="file" accept=".json,application/json" hidden></div>
+     ${UI.restore?`<div class="export"><b style="font-size:13px">Restore ${esc(UI.restore.name)}</b><span style="font-size:12.5px">Backup from ${esc(UI.restore.when)}: ${UI.restore.counts}. This replaces everything currently in the hub.</span>
+       <div style="display:flex;gap:6px"><button class="btn danger small" type="button" id="bkGo">${UI.restore.sure?'Click again to replace everything':'Replace with this backup'}</button><button class="btn small" type="button" id="bkCancel">Cancel</button></div></div>`:''}
+   </section>
+   <section style="border-top:1px solid var(--line);padding-top:14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" type="button" id="suDone">${m.setupDone?'Done, back to house':'Finish setup'}</button>${m.setupDone?'<span class="okline">Setup complete. Changes save as you make them.</span>':'<span class="muted" style="font-size:12.5px">Changes save as you make them.</span>'}</div></section>
+  </div>
+  <div class="preview"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>${LEVELS[lv]} · live preview</h2><span class="muted" style="font-size:12px">Dashed outline = house footprint · click a room to edit its doors and windows</span></div>
+   <svg viewBox="${vb.join(' ')}" role="img" aria-label="${LEVELS[lv]} preview">${planG(lv,{fill:'plain',dims:true,click:'srm',sel:UI.setupSel})}</svg></div></section>`;
+}
+function parseCSV(text){
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean); if(!lines.length) return {rows:[],errors:['The CSV is empty.']};
+  const split=l=>{ const out=[]; let cur='',q=false; for(const ch of l){ if(ch==='"'){q=!q;continue;} if((ch===','||ch===';'||ch==='\t')&&!q){out.push(cur.trim());cur='';continue;} cur+=ch; } out.push(cur.trim()); return out; };
+  let start=0; if(/name/i.test(lines[0])) start=1;
+  const rows=[],errors=[];
+  for(let i=start;i<lines.length;i++){ const c=split(lines[i]); if(c.length<6){ errors.push(`Line ${i+1}: needs at least 6 columns.`); continue; }
+    const lvRaw=c[0].toLowerCase(); const level=/^(0|g|gr|ground)/.test(lvRaw)?0:/^(1|f|first)/.test(lvRaw)?1:/^(2|r|roof)/.test(lvRaw)?2:null;
+    const nums=c.slice(2,6).map(v=>Number(String(v).replace(',','.')));
+    if(level==null){ errors.push(`Line ${i+1}: level "${c[0]}" should be G, F or R.`); continue; }
+    if(!c[1]){ errors.push(`Line ${i+1}: room name is missing.`); continue; }
+    if(nums.some(n=>isNaN(n))||nums[2]<=0||nums[3]<=0){ errors.push(`Line ${i+1}: position and size must be numbers in metres.`); continue; }
+    rows.push({level,name:c[1],x:nums[0],y:nums[1],w:nums[2],d:nums[3],outdoor:/^(y|yes|true|1|out)/i.test(c[6]||'')}); }
+  return {rows,errors};
+}
+function roomsCSV(){ return 'level,name,from_left,from_front,width,depth,outdoor\n'+roomList().map(r=>[['G','F','R'][r.level],/[,"]/.test(r.name)?'"'+r.name.replace(/"/g,'')+'"':r.name,r.x,r.y,r.w,r.d,r.outdoor?'yes':'no'].join(',')).join('\n'); }
+function importCSV(){
+  const {rows,errors}=parseCSV(UI.csv.text);
+  if(!rows.length){ UI.csv.msg=errors.join(' ')||'Nothing to import.'; UI.csv.err=true; renderSetup(); return; }
+  const existing=roomList(); const key=(l,n)=>l+'|'+n.trim().toLowerCase(); const map=Object.fromEntries(existing.map(r=>[key(r.level,r.name),r]));
+  let up=0,add=0,del=0; const seen=new Set();
+  for(const r of rows){ const k=key(r.level,r.name); seen.add(k); const ex=map[k];
+    if(ex){ moveRoom(ex.id,{x:r.x,y:r.y,w:r.w,d:r.d,outdoor:r.outdoor,name:r.name}); up++; }
+    else { saveRoom(uid('r'),{name:r.name,level:r.level,x:r.x,y:r.y,w:r.w,d:r.d,outdoor:r.outdoor,notes:'',walls:{},images:[],openings:[]}); add++; } }
+  if(UI.csv.prune){ for(const r of existing){ if(!seen.has(key(r.level,r.name))){ deleteRoom(r.id); del++; } } }
+  UI.csv.msg=`Imported: ${up} updated, ${add} added${UI.csv.prune?`, ${del} removed`:''}.${errors.length?' Skipped: '+errors.join(' '):''}`; UI.csv.err=!!errors.length;
+}
+function backupJSON(){ return JSON.stringify({app:'house-hub',version:1,exported:new Date().toISOString(),meta:S.meta,rooms:S.rooms,tasks:S.tasks,points:S.points,items:S.items},null,2); }
+function restoreBackup(d){
+  for(const col of ['rooms','tasks','points','items']){ const keep=d[col]||{}; for(const id of Object.keys(S[col])) if(!keep[id]) store.del(col,id); for(const [id,v] of Object.entries(keep)) store.put(col,id,v); }
+  if(d.meta) store.put('meta','house',{...d.meta});
+}
+function deleteRoom(id){ store.del('rooms',id); taskList().filter(x=>x.roomId===id).forEach(x=>{const n=clone(S.tasks[x.id]); n.roomId=''; saveTask(x.id,n);}); pointList().filter(p=>p.roomId===id).forEach(p=>store.del('points',p.id)); itemList().filter(x=>x.roomId===id).forEach(x=>{const n=clone(S.items[x.id]); n.roomId=''; store.put('items',x.id,n);}); }
+
+/* ---------- Budget ---------- */
+function unitPrice(it){ const qs=(it.quotes||[]).filter(q=>q.price!==''&&q.price!=null&&!isNaN(+q.price)); const ch=qs.find(q=>q.id===it.chosen); if(ch) return +ch.price; if(qs.length) return Math.min(...qs.map(q=>+q.price)); return it.estimate!==''&&it.estimate!=null&&!isNaN(+it.estimate)?+it.estimate:null; }
+function lineTotal(it){ const u=unitPrice(it); return u==null?null:u*(+it.qty||1); }
+function renderBudget(){
+  const all=itemList(); const f=UI.bf; const q=f.q.trim().toLowerCase();
+  const list=all.filter(i=>(!f.cat||i.category===f.cat)&&(!f.room||i.roomId===f.room)&&(!q||(i.name+' '+(i.notes||'')+' '+(i.quotes||[]).map(x=>x.supplier).join(' ')).toLowerCase().includes(q)));
+  const sum=arr=>arr.reduce((a,i)=>a+(lineTotal(i)||0),0);
+  const planned=sum(all), committed=sum(all.filter(i=>['ordered','paid','delivered'].includes(i.status))), paid=sum(all.filter(i=>['paid','delivered'].includes(i.status)));
+  const unpriced=all.filter(i=>lineTotal(i)==null).length; const needQuotes=all.filter(i=>!(i.quotes||[]).length).length;
+  const byCat=CATS.map(c=>({...c,t:sum(all.filter(i=>i.category===c.key)),n:all.filter(i=>i.category===c.key).length})).filter(c=>c.n);
+  const max=Math.max(1,...byCat.map(c=>c.t));
+  const row=i=>{ const qs=(i.quotes||[]).filter(x=>x.price!==''&&!isNaN(+x.price)); const ch=qs.find(x=>x.id===i.chosen); const best=qs.length?qs.reduce((a,b)=>+a.price<=+b.price?a:b):null; const shown=ch||best;
+    return `<tr data-item="${i.id}"><td><b style="font-weight:500">${esc(i.name)}</b>${i.roomId?`<div class="muted" style="font-size:12px">${esc(roomName(i.roomId))}</div>`:''}</td>
+     <td>${shown?`${esc(shown.supplier||'Unnamed supplier')}<div class="muted" style="font-size:12px">${ch?'chosen':'cheapest'} of ${qs.length} quote${qs.length>1?'s':''}</div>`:`<span class="muted">${i.estimate?'estimate only':'no quotes yet'}</span>`}</td>
+     <td class="r">${+i.qty||1}</td><td class="r">${eur(unitPrice(i))}</td><td class="r"><b>${eur(lineTotal(i))}</b></td><td><span class="pill ${i.status||'idea'}">${IST[i.status||'idea'].label}</span></td></tr>`; };
+  let body=''; for(const c of CATS){ const l=list.filter(i=>i.category===c.key).sort((a,b)=>(a.created||0)-(b.created||0)); if(!l.length) continue; body+=`<tr class="cat"><td colspan="4">${esc(c.label)}</td><td class="r">${eur(sum(l))}</td><td></td></tr>`+l.map(row).join(''); }
+  $('#main').innerHTML=`<div class="page">
+   <div class="tiles">
+     <div class="tile"><span class="k">Planned spend</span><span class="v">${eur(planned)}</span><span class="s">${all.length} items · chosen quote, else cheapest, else estimate</span></div>
+     <div class="tile"><span class="k">Committed</span><span class="v">${eur(committed)}</span><span class="s">ordered, paid or delivered</span></div>
+     <div class="tile"><span class="k">Paid</span><span class="v">${eur(paid)}</span><span class="s">${planned?Math.round(paid/planned*100)+'% of planned':'nothing paid yet'}</span></div>
+     <div class="tile"><span class="k">Still to price</span><span class="v">${unpriced}</span><span class="s">${needQuotes} item${needQuotes===1?'':'s'} with no quotes</span></div>
+   </div>
+   <div class="toolbar"><input class="inp" id="bq" type="search" placeholder="Search items or suppliers" value="${esc(f.q)}" style="width:230px" aria-label="Search items">
+     <select class="inp" id="bcat" aria-label="Category"><option value="">All categories</option>${CATS.map(c=>`<option value="${c.key}" ${f.cat===c.key?'selected':''}>${esc(c.label)}</option>`).join('')}</select>
+     <select class="inp" id="broom" aria-label="Room"><option value="">All rooms</option>${roomList().map(r=>`<option value="${r.id}" ${f.room===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select>
+     <button class="btn primary" type="button" id="addItem" style="margin-left:auto">+ Add item to buy</button></div>
+   <div class="budget-grid">
+     <div class="tbl-wrap">${list.length?`<table class="btbl"><thead><tr><th>Item</th><th>Supplier</th><th class="r">Qty</th><th class="r">Unit</th><th class="r">Total</th><th>Status</th></tr></thead><tbody>${body}</tbody></table>`:`<div class="empty" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px">${all.length?'No items match these filters.':'Nothing here yet. Add the things you want to buy, such as the kitchen, appliances, light fittings or plaster, then log each quote you get and where it is from.'}</div>`}</div>
+     <div class="tile" style="gap:8px"><span class="k">By category</span>${byCat.length?byCat.sort((a,b)=>b.t-a.t).map(c=>`<div style="display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:12.5px;cursor:pointer" data-bcat="${c.key}"><span>${esc(c.label)}</span><span class="num mono">${eur(c.t)}</span><div class="bar" style="grid-column:span 2;height:6px"><i style="width:${c.t/max*100}%;background:var(--accent)"></i></div></div>`).join(''):'<span class="muted" style="font-size:12.5px">Totals per category appear here.</span>'}</div>
+   </div></div>`;
+}
+function openItem(id){
+  const base=id?clone(S.items[id]):{name:'',category:'other',roomId:UI.view==='house'&&UI.room?UI.room:'',qty:1,status:'idea',estimate:'',notes:'',quotes:[],chosen:'',created:Date.now()};
+  const it=base; const ov=document.createElement('div'); ov.className='overlay';
+  const qRow=(q,i,best)=>`<div class="quote${it.chosen===q.id?' chosen':''}"><input type="radio" name="chosen" value="${q.id}" ${it.chosen===q.id?'checked':''} aria-label="Choose this quote" title="Choose this quote">
+    <input class="inp" data-q="${i}" data-qf="supplier" value="${esc(q.supplier)}" placeholder="Supplier / shop" aria-label="Supplier">
+    <input class="inp" data-q="${i}" data-qf="price" type="number" step="0.01" min="0" value="${esc(q.price)}" placeholder="€ per unit" aria-label="Price per unit">
+    <button class="btn ghost small" type="button" data-qdel="${i}" aria-label="Remove quote">✕</button>
+    <div class="wide"><input class="inp" data-q="${i}" data-qf="url" value="${esc(q.url||'')}" placeholder="Link or phone" aria-label="Link"><input class="inp" data-q="${i}" data-qf="note" value="${esc(q.note||'')}" placeholder="Note (delivery, VAT, lead time)" aria-label="Note">
+    <span style="grid-column:span 2;display:flex;gap:8px;align-items:center;font-size:12px">${q.file?`<a href="${esc(q.file.url||'/_blob/'+q.file.id)}" target="_blank" rel="noopener">${esc(q.file.name||'Quote file')}</a>`:''}${CAP.assets?`<label class="btn small ghost" for="qfile${i}">${q.file?'Replace file':'Attach quote PDF / photo'}</label><input id="qfile${i}" data-qfile="${i}" type="file" accept="image/*,application/pdf" hidden>`:''}${best?'<span class="best">Cheapest</span>':''}${q.url&&/^https?:\/\//.test(q.url)?`<a href="${esc(q.url)}" target="_blank" rel="noopener">Open link</a>`:''}</span></div></div>`;
+  const draw=()=>{ const prices=it.quotes.filter(q=>q.price!==''&&!isNaN(+q.price)).map(q=>+q.price); const min=prices.length?Math.min(...prices):null;
+    ov.innerHTML=`<form class="modal" style="width:min(680px,100%)" id="itemForm"><h2>${id?'Edit item':'New item to buy'}</h2>
+    <label class="f" for="ifName">Item<input id="ifName" value="${esc(it.name)}" placeholder="e.g. Kitchen units and worktop, LED downlights ×12, Gypsum plaster 25 kg" required></label>
+    <div class="grid2"><label class="f" for="ifCat">Category<select id="ifCat">${CATS.map(c=>`<option value="${c.key}" ${it.category===c.key?'selected':''}>${esc(c.label)}</option>`).join('')}</select></label>
+    <label class="f" for="ifRoom">Room<select id="ifRoom"><option value="">Whole house / no room</option>${roomList().map(r=>`<option value="${r.id}" ${it.roomId===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select></label></div>
+    <div class="grid3"><label class="f" for="ifQty">Quantity<input id="ifQty" type="number" min="0" step="any" value="${esc(it.qty)}"></label>
+    <label class="f" for="ifStatus">Status<select id="ifStatus">${ISTAT.map(s=>`<option value="${s.key}" ${it.status===s.key?'selected':''}>${s.label}</option>`).join('')}</select></label>
+    <label class="f" for="ifEst">Rough estimate € / unit<input id="ifEst" type="number" min="0" step="0.01" value="${esc(it.estimate)}" placeholder="before quotes"></label></div>
+    <div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 style="font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Quotes</h3><button class="btn small" type="button" id="qAdd">+ Add quote</button></div>
+    <div class="quotes">${it.quotes.map((q,i)=>qRow(q,i,min!=null&&+q.price===min&&prices.length>1)).join('')||'<div class="empty">No quotes yet. Add one for each shop or supplier you ask.</div>'}</div>
+    ${it.quotes.length?'<p class="muted" style="font-size:12px;margin:6px 0 0">Tick the round button on the quote you go with. Until you do, the cheapest one counts towards your budget.</p>':''}</div>
+    <label class="f" for="ifNotes">Notes<textarea id="ifNotes" rows="2">${esc(it.notes||'')}</textarea></label>
+    <div class="row-end">${id?`<button class="btn danger" type="button" id="ifDel">Delete</button>`:'<span></span>'}<span style="display:flex;gap:8px;align-items:center"><span class="muted num" id="ifTotal">${eur(lineTotal(it))}</span><button class="btn" type="button" id="ifCancel">Cancel</button><button class="btn primary" type="submit">Save</button></span></div></form>`; };
+  const pull=()=>{ const g=s=>ov.querySelector(s); if(!g('#ifName')) return; it.name=g('#ifName').value; it.category=g('#ifCat').value; it.roomId=g('#ifRoom').value; it.qty=g('#ifQty').value===''?1:Number(g('#ifQty').value); it.status=g('#ifStatus').value; it.estimate=g('#ifEst').value; it.notes=g('#ifNotes').value;
+    ov.querySelectorAll('[data-qf]').forEach(el=>{ it.quotes[+el.dataset.q][el.dataset.qf]=el.value; }); const c=ov.querySelector('input[name=chosen]:checked'); it.chosen=c?c.value:it.chosen; };
+  draw(); document.body.appendChild(ov); ov.querySelector('#ifName').focus();
+  const close=()=>{ov.remove(); render();};
+  ov.addEventListener('input',()=>{ pull(); const t=ov.querySelector('#ifTotal'); if(t) t.textContent=eur(lineTotal(it)); });
+  ov.addEventListener('change',async e=>{ const t=e.target; if(t.name==='chosen'){ pull(); if(it.status==='idea') it.status='quoted'; draw(); }
+    if(t.dataset.qfile!=null){ const f=t.files[0]; if(!f||!CAP.assets) return; pull(); toast('Uploading '+f.name+'…'); try{ const a=await CAP.assets.upload(f); it.quotes[+t.dataset.qfile].file={id:a.id,url:a.url,name:f.name}; draw(); toast('Quote file attached.'); }catch(err){ toast('Could not upload that file. It must be under 20 MB.'); } } });
+  ov.addEventListener('click',e=>{ const t=e.target; if(t===ov||t.id==='ifCancel'){ close(); return; }
+    if(t.id==='qAdd'){ pull(); it.quotes.push({id:uid('q'),supplier:'',price:'',url:'',note:'',date:todayISO()}); if(it.status==='idea') it.status='quoted'; draw(); const ins=ov.querySelectorAll('[data-qf="supplier"]'); ins[ins.length-1]?.focus(); return; }
+    if(t.dataset.qdel!=null){ pull(); const [q]=it.quotes.splice(+t.dataset.qdel,1); if(q&&q.id===it.chosen) it.chosen=''; draw(); return; }
+    if(t.id==='ifDel'){ if(t.dataset.sure){ store.del('items',id); close(); } else { t.dataset.sure='1'; t.textContent='Click again to delete'; } } });
+  ov.addEventListener('keydown',e=>{ if(e.key==='Escape') close(); });
+  ov.addEventListener('submit',e=>{ e.preventDefault(); pull(); if(!it.name.trim()) return; it.name=it.name.trim(); it.quotes=it.quotes.filter(q=>q.supplier||q.price!==''||q.file); if(!it.quotes.some(q=>q.id===it.chosen)) it.chosen=''; ov.remove(); store.put('items',id||uid('i'),it); });
+}
+
+/* ---------- PDF export ---------- */
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('Could not load '+src)); document.head.appendChild(s); }); }
+const pdfSafe=s=>String(s??'').replace(/[–—]/g,'-').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/→/g,'>').replace(/[^\x20-\x7E -ÿ€]/g,'');
+function hexRgb(h){ const P=window.PDFLib; if(h==='var(--good)') h='#2c8a4b'; const m=/^#?([0-9a-f]{6})$/i.exec(h)||[0,'333333']; const n=parseInt(m[1],16); return P.rgb(((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255); }
+const DISC={arch:{title:'Architectural layout',code:'A'},elec:{title:'Electrical & lighting layout',code:'E'},plumb:{title:'Plumbing & gas layout',code:'P'},walls:{title:'Wall works schedule',code:'W'}};
+async function exportPDF(){
+  const discs=Object.keys(DISC).filter(k=>UI.exp.disc[k]); const lvls=[0,1,2].filter(i=>UI.exp.levels[i]&&roomList().some(r=>r.level===i));
+  if(!discs.length||!lvls.length){ toast('Pick at least one drawing and one level that has rooms.'); return; }
+  if(!CAP.downloads){ toast('PDF downloads work on the published page.'); return; }
+  UI.exp.busy=true; renderPlans();
+  try{
+    if(!window.PDFLib) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js');
+    const bytes=await buildPDF(discs,lvls);
+    const name=pdfSafe((S.meta.name||'House').replace(/[^\w\- ]+/g,'').trim()||'House')+' drawings '+todayISO()+'.pdf';
+    await CAP.downloads.save({filename:name,data:bytes});
+    toast('PDF saved.');
+  }catch(e){ console.error(e); if(e&&e.code==='declined'){} else toast(e&&e.code==='rate_limited'?'A download prompt is already open.':'Could not build the PDF. Try again.'); }
+  UI.exp.busy=false; if(UI.view==='plans') renderPlans();
+}
+async function buildPDF(discs,lvls){
+  const P=window.PDFLib; const pdf=await P.PDFDocument.create(); pdf.setTitle(pdfSafe((S.meta.name||'House')+' drawings')); pdf.setCreator('House Completion Hub');
+  const F=await pdf.embedFont(P.StandardFonts.Helvetica), FB=await pdf.embedFont(P.StandardFonts.HelveticaBold);
+  const PW=1190.55, PH=841.89, M=24, TB=262; const ink=P.rgb(.11,.13,.15), grey=P.rgb(.45,.48,.5), light=P.rgb(.82,.84,.85);
+  const b=houseBounds(); const pad=1.3; const bw=(b.x1-b.x0)+pad*2, bh=(b.y1-b.y0)+pad*2;
+  const aw=PW-M*2-TB-14, ah=PH-M*2-20;
+  const scales=[20,25,50,75,100,125,150,200,250,500]; let sc=scales.find(s=>bw*2834.65/s<=aw&&bh*2834.65/s<=ah)||500; const k=2834.65/sc;
+  const ox=M+(aw-bw*k)/2+pad*k, oyTop=M+10+(ah-bh*k)/2+pad*k;
+  const X=x=>ox+(x-b.x0)*k, Y=y=>PH-(oyTop+(y-b.y0)*k);
+  const total=discs.length*lvls.length; let sheet=0;
+  for(const disc of discs) for(const lv of lvls){
+    sheet++; const pg=pdf.addPage([PW,PH]); const rs=roomList().filter(r=>r.level===lv);
+    const T=(t,x,y,o={})=>{ const f=o.bold?FB:F, sz=o.size||8; t=pdfSafe(t); let tx=x; const w=f.widthOfTextAtSize(t,sz); if(o.align==='center') tx=x-w/2; if(o.align==='right') tx=x-w; pg.drawText(t,{x:tx,y,size:sz,font:f,color:o.color||ink,rotate:o.rotate?P.degrees(o.rotate):undefined}); return w; };
+    const L=(x1,y1,x2,y2,th=.6,c=ink,dash)=>pg.drawLine({start:{x:x1,y:y1},end:{x:x2,y:y2},thickness:th,color:c,dashArray:dash});
+    // frame
+    pg.drawRectangle({x:M-8,y:M-8,width:PW-2*M+16,height:PH-2*M+16,borderColor:ink,borderWidth:1});
+    // footprint
+    const fw=+S.meta.width||0, fd=+S.meta.depth||0; if(fw>0&&fd>0){ const pts=[[0,0],[fw,0],[fw,fd],[0,fd],[0,0]]; for(let i=0;i<4;i++) L(X(pts[i][0]),Y(pts[i][1]),X(pts[i+1][0]),Y(pts[i+1][1]),.5,grey,[4,3]); }
+    // rooms
+    for(const r of rs){ const c=r.outdoor?P.rgb(.92,.95,.9):disc==='arch'?P.rgb(.95,.95,.94):P.rgb(.98,.98,.98); pg.drawRectangle({x:X(r.x),y:Y(r.y+r.d),width:r.w*k,height:r.d*k,color:c}); }
+    for(const r of rs) for(const [kk,s] of Object.entries(WALL_SEGS(r))){ const ws=disc==='walls'?wallState((r.walls||{})[kk]):null; const [x1,y1,x2,y2]=insetSeg(kk,s,.06); L(X(x1),Y(y1),X(x2),Y(y2),ws?Math.max(2.4,.12*k):Math.max(1.2,.07*k),ws?hexRgb(ws.color):ink); }
+    for(const r of rs) for(const op of (r.openings||[])){ const q=openingGeom(r,op); if(!q) continue;
+      L(X(q.p0[0]),Y(q.p0[1]),X(q.p1[0]),Y(q.p1[1]),Math.max(5,.34*k),P.rgb(1,1,1));
+      const nx=q.n[0]*.17,ny=q.n[1]*.17; for(const p of [q.p0,q.p1]) L(X(p[0]-nx),Y(p[1]-ny),X(p[0]+nx),Y(p[1]+ny),.8,ink);
+      if(op.type==='door'){ L(X(q.hinge[0]),Y(q.hinge[1]),X(q.leaf[0]),Y(q.leaf[1]),1,ink); for(let i=0;i<q.arc.length-1;i++) L(X(q.arc[i][0]),Y(q.arc[i][1]),X(q.arc[i+1][0]),Y(q.arc[i+1][1]),.4,grey); }
+      else if(op.type==='window'){ for(const f of [-.07,0,.07]) L(X(q.p0[0]+q.n[0]*f),Y(q.p0[1]+q.n[1]*f),X(q.p1[0]+q.n[0]*f),Y(q.p1[1]+q.n[1]*f),.5,ink); }
+      if(disc==='arch'){ const mx=(q.p0[0]+q.p1[0])/2+q.n[0]*.35, my=(q.p0[1]+q.p1[1])/2+q.n[1]*.35; T(`${op.type==='door'?'D':op.type==='window'?'W':'O'} ${(+q.w).toFixed(2)}`,X(mx),Y(my)-2,{size:5.5,align:'center',color:grey}); } }
+    // labels
+    for(const r of rs){ const cx=X(r.x+r.w/2), cy=disc==='elec'||disc==='plumb'?Y(r.y)-Math.min(20,r.d*k/3):Y(r.y+r.d/2); let sz=Math.min(9,r.w*k/9); const nw=FB.widthOfTextAtSize(pdfSafe(r.name),1); sz=Math.max(4.5,Math.min(sz<5.5?5.5:sz,(r.w*k-6)/nw));
+      T(r.name,cx,cy+2,{bold:true,size:sz,align:'center'});
+      if(disc==='arch') T(`${(+r.w).toFixed(2)} x ${(+r.d).toFixed(2)} m · ${(r.w*r.d).toFixed(1)} m²`,cx,cy-sz,{size:sz*.72,align:'center',color:grey}); }
+    // points
+    const secs=disc==='elec'?['electrical','lighting']:disc==='plumb'?['plumbing']:[];
+    const pts=pointList().filter(p=>PT[p.type]&&secs.includes(PT[p.type].sector)&&rs.some(r=>r.id===p.roomId));
+    for(const p of pts){ const ty=PT[p.type]; const c=hexRgb(SEC[ty.sector].color); const x=X(p.x), y=Y(p.y);
+      pg.drawCircle({x,y,size:6.5,color:p.done?c:P.rgb(1,1,1),borderColor:c,borderWidth:1.1}); T(ty.g,x,y-2.1,{bold:true,size:ty.g.length>1?4.6:6,align:'center',color:p.done?P.rgb(1,1,1):c});
+      if(p.label) T(p.label,x+9,y-2.5,{size:5.5,color:grey}); }
+    // overall dims
+    const W=b.x1-b.x0, D=b.y1-b.y0; const dy=Y(b.y0)+.7*k, dx=X(b.x0)-.7*k;
+    L(X(b.x0),dy,X(b.x1),dy,.5,grey); L(X(b.x0),dy-4,X(b.x0),dy+4,.5,grey); L(X(b.x1),dy-4,X(b.x1),dy+4,.5,grey); T(`${W.toFixed(2)} m`,X(b.x0+W/2),dy+4,{size:7,align:'center',color:grey});
+    T('STREET / FRONT',X(b.x0+W/2),dy+14,{size:6.5,align:'center',bold:true,color:grey});
+    L(dx,Y(b.y0),dx,Y(b.y1),.5,grey); L(dx-4,Y(b.y0),dx+4,Y(b.y0),.5,grey); L(dx-4,Y(b.y1),dx+4,Y(b.y1),.5,grey); T(`${D.toFixed(2)} m`,dx-4,Y(b.y0+D/2),{size:7,align:'center',color:grey,rotate:90});
+    // title block
+    const tx=PW-M-TB, tw=TB; L(tx,M-8,tx,PH-M+8,1,ink);
+    let y=PH-M-10; const line=()=>{ L(tx,y,PW-M+8,y,.5,light); y-=14; };
+    T(DISC[disc].title.toUpperCase(),tx+10,y-6,{bold:true,size:12}); y-=24; T(LEVELS[lv],tx+10,y,{size:10}); y-=14; line();
+    const kv=(a,v)=>{ T(a,tx+10,y,{size:6.5,color:grey}); T(v,tx+tw-4,y,{size:7.5,align:'right'}); y-=12; };
+    kv('Project',S.meta.name||'House'); kv('Scale',`1:${sc} @ A3`); kv('Date',new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})); kv('Drawing',`${DISC[disc].code}-${lv}`); kv('Sheet',`${sheet} of ${total}`); kv('Dimensions','metres'); y-=2; line();
+    if(disc==='arch'){ T('ROOM SCHEDULE',tx+10,y,{bold:true,size:7.5}); y-=13; let tot=0;
+      for(const r of rs){ if(y<M+40) break; T(r.name,tx+10,y,{size:6.8}); T(`${(+r.w).toFixed(2)} x ${(+r.d).toFixed(2)}`,tx+tw-58,y,{size:6.8,align:'right',color:grey}); T(`${(r.w*r.d).toFixed(1)} m²`,tx+tw-4,y,{size:6.8,align:'right'}); y-=11; if(!r.outdoor) tot+=r.w*r.d; }
+      y-=3; T('Indoor floor area',tx+10,y,{bold:true,size:7}); T(`${tot.toFixed(1)} m²`,tx+tw-4,y,{bold:true,size:7,align:'right'}); y-=14;
+      T('D = door, W = window, O = opening, with clear width (m)',tx+10,y,{size:6,color:grey}); }
+    else if(disc==='walls'){ T('LEGEND',tx+10,y,{bold:true,size:7.5}); y-=13; for(const s of STAGES){ L(tx+10,y+3,tx+28,y+3,3,hexRgb(s.color)); T('Needs '+s.label.toLowerCase(),tx+34,y,{size:6.8}); y-=11; } L(tx+10,y+3,tx+28,y+3,3,hexRgb('#2c8a4b')); T('All stages finished',tx+34,y,{size:6.8}); y-=16;
+      T('SCHEDULE (o = needed, x = done)',tx+10,y,{bold:true,size:7.5}); y-=12; const cols=['Sh','Pl','Re','Pa']; cols.forEach((c,i)=>T(c,tx+tw-4-(3-i)*26,y,{size:6.2,align:'right',color:grey})); y-=10;
+      for(const r of rs){ if(y<M+30) break; const w=r.walls||{}; const surf=WALLS.filter(s=>STAGES.some(g=>(w[s.key]||{})[g.key])); if(!surf.length) continue; T(r.name,tx+10,y,{bold:true,size:6.6}); y-=10;
+        for(const s of surf){ if(y<M+20) break; T('  '+s.label,tx+10,y,{size:6.4}); STAGES.forEach((g,i)=>{ const v=(w[s.key]||{})[g.key]; if(v) T(v==='done'?'x':'o',tx+tw-4-(3-i)*26,y,{size:6.6,align:'right',bold:v==='done'}); }); y-=9.5; } } }
+    else { T('LEGEND',tx+10,y,{bold:true,size:7.5}); y-=14; const types=PTYPES.filter(p=>secs.includes(p.sector));
+      for(const ty of types){ const n=pts.filter(p=>p.type===ty.key); const c=hexRgb(SEC[ty.sector].color); pg.drawCircle({x:tx+16,y:y+2.5,size:5,borderColor:c,borderWidth:1,color:P.rgb(1,1,1)}); T(ty.g,tx+16,y+.6,{bold:true,size:ty.g.length>1?3.8:5,align:'center',color:c}); T(ty.label,tx+28,y,{size:6.8}); T(`${n.filter(p=>p.done).length}/${n.length}`,tx+tw-4,y,{size:6.8,align:'right'}); y-=12; }
+      T('Filled symbol = installed. Counts = installed / planned.',tx+10,y,{size:6,color:grey}); y-=16;
+      T('SCHEDULE BY ROOM',tx+10,y,{bold:true,size:7.5}); y-=12;
+      for(const r of rs){ const l=pts.filter(p=>p.roomId===r.id); if(!l.length) continue; if(y<M+20) break; const parts=types.map(ty=>{const n=l.filter(p=>p.type===ty.key).length; return n?`${n} ${ty.g}`:''}).filter(Boolean).join(', ');
+        T(r.name,tx+10,y,{size:6.6}); T(parts,tx+tw-4,y,{size:6.4,align:'right',color:grey}); y-=10; }
+      if(!pts.length) T('No points placed on this level yet.',tx+10,y,{size:6.6,color:grey}); }
+    T('Drawn from site measurements. Check on site before work.',tx+10,M,{size:5.8,color:grey});
+  }
+  return await pdf.save();
+}
+
+/* ---------- Extra event handlers ---------- */
+function handleExtraClick(t,e){
+  const ib=t.closest('[data-item]'); if(ib){ openItem(ib.dataset.item); return true; }
+  if(t.closest('#addItem')){ openItem(null); return true; }
+  const bc=t.closest('[data-bcat]'); if(bc){ UI.bf.cat=bc.dataset.bcat; renderBudget(); return true; }
+  if(t.closest('#expBtn')){ exportPDF(); return true; }
+  const sl=t.closest('[data-slevel]'); if(sl){ UI.setupLevel=Number(sl.dataset.slevel); UI.setupSel=null; renderSetup(); return true; }
+  const ss=t.closest('[data-ssel]'); if(ss){ UI.setupSel=ss.dataset.ssel; renderSetup(); return true; }
+  const sr=t.closest('[data-srm]'); if(sr){ UI.setupSel=sr.dataset.srm; renderSetup(); return true; }
+  const rd=t.closest('[data-rdel]'); if(rd){ const id=rd.dataset.rdel; if(UI.confirmDel===id){ deleteRoom(id); UI.confirmDel=null; if(UI.setupSel===id) UI.setupSel=null; } else { UI.confirmDel=id; renderSetup(); } return true; }
+  if(t.closest('#suAddRoom')){ const lv=UI.setupLevel; const rs=roomList().filter(r=>r.level===lv); const y=rs.length?Math.max(...rs.map(r=>r.y+r.d)):0; const id=uid('r'); UI.setupSel=id; saveRoom(id,{name:'New room',level:lv,x:0,y:Math.round(y*100)/100,w:3,d:3,outdoor:false,notes:'',walls:{},images:[],openings:[]}); return true; }
+  const oa=t.closest('[data-oadd]'); if(oa){ const r=clone(S.rooms[UI.setupSel]); r.openings=r.openings||[]; r.openings.push({wall:'front',type:oa.dataset.oadd,offset:0.3,width:oa.dataset.oadd==='door'?0.8:oa.dataset.oadd==='window'?1.0:0.9,hinge:'start'}); saveRoom(UI.setupSel,r); return true; }
+  const od=t.closest('[data-odel]'); if(od){ const r=clone(S.rooms[UI.setupSel]); r.openings.splice(Number(od.dataset.odel),1); saveRoom(UI.setupSel,r); return true; }
+  if(t.closest('#suDone')){ saveMeta({setupDone:true}); go('house'); return true; }
+  if(t.closest('#csvCur')){ UI.csv.text=roomsCSV(); UI.csv.msg=''; renderSetup(); return true; }
+  if(t.closest('#csvDl')){ CAP.downloads.save({filename:'house rooms.csv',data:roomsCSV()}).catch(err=>{ if(err&&err.code!=='declined') toast('Could not save the CSV.'); }); return true; }
+  if(t.closest('#bkSave')){ CAP.downloads.save({filename:`house-hub-backup-${todayISO()}.json`,data:backupJSON()}).then(()=>{ saveMeta({lastBackup:todayISO()}); toast('Backup saved.'); }).catch(err=>{ if(err&&err.code!=='declined') toast('Could not save the backup.'); }); return true; }
+  if(t.closest('#bkCopy')){ navigator.clipboard.writeText(backupJSON()).then(()=>toast('Backup copied. Paste it into a .json file in your data repo.')).catch(()=>toast('Copy was blocked here. Use Download backup instead.')); return true; }
+  if(t.closest('#bkCancel')){ UI.restore=null; renderSetup(); return true; }
+  if(t.closest('#bkGo')){ if(!UI.restore.sure){ UI.restore.sure=true; renderSetup(); return true; } restoreBackup(UI.restore.data); UI.restore=null; toast('Backup restored.'); go('house'); return true; }
+  if(t.closest('#csvGo')){ UI.csv.text=$('#csvText').value; importCSV(); renderSetup(); return true; }
+  return false;
+}
+function handleExtraChange(t){
+  if(t.id==='bcat'){ UI.bf.cat=t.value; renderBudget(); return true; }
+  if(t.id==='broom'){ UI.bf.room=t.value; renderBudget(); return true; }
+  if(t.dataset.expd){ UI.exp.disc[t.dataset.expd]=t.checked; return true; }
+  if(t.dataset.expl!=null){ UI.exp.levels[Number(t.dataset.expl)]=t.checked; return true; }
+  if(t.id==='suName'){ saveMeta({name:t.value.trim()||'My house'}); return true; }
+  if(t.id==='suW'){ saveMeta({width:Math.max(0,Number(t.value)||0)}); return true; }
+  if(t.id==='suD'){ saveMeta({depth:Math.max(0,Number(t.value)||0)}); return true; }
+  if(t.dataset.height!=null){ const h=[...(S.meta.heights||[2.9,2.9,2.4])]; h[Number(t.dataset.height)]=Math.max(1,Number(t.value)||2.7); saveMeta({heights:h}); return true; }
+  if(t.dataset.rf){ const id=t.dataset.rid, f=t.dataset.rf; if(!S.rooms[id]) return true; let v=f==='outdoor'?t.checked:f==='name'?(t.value.trim()||'Room'):Number(t.value); if(f==='w'||f==='d') v=Math.max(.3,v||.3); if((f==='x'||f==='y')&&isNaN(v)) v=0; moveRoom(id,{[f]:v}); return true; }
+  if(t.dataset.of){ const r=clone(S.rooms[UI.setupSel]); const o=r.openings[Number(t.dataset.oi)]; const f=t.dataset.of; o[f]=(f==='offset'||f==='width')?Math.max(0,Number(t.value)||0):t.value; saveRoom(UI.setupSel,r); return true; }
+  if(t.id==='bkFile'){ const f=t.files[0]; if(!f) return true; f.text().then(txt=>{ let d; try{ d=JSON.parse(txt); }catch(_){ toast('That file is not valid JSON.'); return; }
+      if(!d||d.app!=='house-hub'||typeof d.rooms!=='object'){ toast('That file is not a House hub backup.'); return; }
+      const n=k=>Object.keys(d[k]||{}).length; UI.restore={name:f.name,data:d,when:d.exported?new Date(d.exported).toLocaleString('en-GB'):'unknown date',counts:`${n('rooms')} rooms, ${n('tasks')} tasks, ${n('points')} points, ${n('items')} items`,sure:false}; renderSetup(); }); t.value=''; return true; }
+  if(t.id==='csvPrune'){ UI.csv.prune=t.checked; return true; }
+  if(t.id==='csvFile'){ const f=t.files[0]; if(!f) return true; f.text().then(txt=>{ UI.csv.text=txt; UI.csv.msg='Loaded '+f.name+'. Check it, then press Import.'; UI.csv.err=false; renderSetup(); }); return true; }
+  return false;
+}
+document.addEventListener('input',e=>{ const t=e.target; if(t.id==='bq'){ UI.bf.q=t.value; clearTimeout(window._bq); window._bq=setTimeout(()=>{ const pos=t.selectionStart; t.blur(); renderBudget(); const n=$('#bq'); if(n){n.focus(); try{n.setSelectionRange(pos,pos);}catch(_){}} },250); } if(t.id==='csvText') UI.csv.text=t.value; });
+
+/* ---------- Routing ---------- */
+const VIEWS=['house','tasks','timeline','plans','dump','budget','setup'];
+function go(v){ UI.view=v; if(location.hash!=='#'+v) history.replaceState(null,'','#'+v); const a=document.activeElement; a&&a.blur&&a.blur(); deferred=false; $('#main').innerHTML=''; render(); }
+window.addEventListener('hashchange',()=>{ const h=location.hash.slice(1); if(VIEWS.includes(h)&&h!==UI.view) go(h); });
+window.addEventListener('resize',()=>{ if(UI.view==='house'&&UI.dim==='3d'){ UI.zoom=null; build3D(); } });
+
+/* ---------- Boot ---------- */
+(async function boot(){
+  const h=location.hash.slice(1); if(VIEWS.includes(h)) UI.view=h;
+  render();
+  await store.init();
+  store.watch('rooms',o=>{S.rooms=o; S.loaded.rooms=true; scheduleRender();});
+  store.watch('tasks',o=>{S.tasks=o; S.loaded.tasks=true; scheduleRender();});
+  store.watch('points',o=>{S.points=o; S.loaded.points=true; scheduleRender();});
+  store.watch('items',o=>{S.items=o; scheduleRender();});
+  store.watchDoc('meta/house',m=>{ if(m) S.meta={...S.meta,...m}; scheduleRender(); });
+  window.HUB={S,store,UI};
+})();
+</script>
+</body>
+</html>
