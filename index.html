@@ -1097,7 +1097,30 @@ function renderSetup(){
    <section style="border-top:1px solid var(--line);padding-top:14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" type="button" id="suDone">${m.setupDone?'Done, back to house':'Finish setup'}</button>${m.setupDone?'<span class="okline">Setup complete. Changes save as you make them.</span>':'<span class="muted" style="font-size:12.5px">Changes save as you make them.</span>'}</div></section>
   </div>
   <div class="preview"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>${LEVELS[lv]} · live preview</h2><span class="muted" style="font-size:12px">Dashed outline = house footprint · click a room to edit its doors and windows</span></div>
-   <svg viewBox="${vb.join(' ')}" role="img" aria-label="${LEVELS[lv]} preview">${planG(lv,{fill:'plain',dims:true,click:'srm',sel:UI.setupSel})}</svg></div></section>`;
+   <svg id="setupSvg" viewBox="${vb.join(' ')}" role="img" aria-label="${LEVELS[lv]} preview" style="touch-action:none">${planG(lv,{fill:'plain',dims:true,click:'srm',sel:UI.setupSel})}${sel?`<rect data-sres="${sel.id}" x="${sel.x+sel.w-.18}" y="${sel.y+sel.d-.18}" width=".36" height=".36" rx=".06" fill="var(--accent)" stroke="var(--panel)" stroke-width=".04" style="cursor:nwse-resize"><title>Drag to resize</title></rect>`:''}</svg>
+   <p class="muted" style="margin:0;font-size:12.5px">Drag a room to move it. Select it and drag the blue corner to resize it. Edges snap to neighbouring rooms and the footprint. Rename a room in the table on the left to change what it is.</p></div></section>`;
+  bindSetupPlan();
+}
+function bindSetupPlan(){
+  const svg=$('#setupSvg'); if(!svg) return; let dr=null;
+  const snapAxis=(v,len,cands)=>{ let best=null; for(const c of cands){ for(const [edge,off] of [[v,0],[v+len,len]]){ const d=Math.abs(edge-c); if(d<.15&&(!best||d<best.d)) best={d,v:c-off}; } } return best?best.v:Math.round(v*20)/20; };
+  const snapEdge=(v,cands)=>{ for(const c of cands) if(Math.abs(v-c)<.15) return c; return Math.round(v*20)/20; };
+  svg.addEventListener('pointerdown',e=>{ const rs=e.target.closest('[data-sres]'), rm=e.target.closest('[data-srm]'); if(!rs&&!rm) return;
+    const id=(rs||rm).dataset[rs?'sres':'srm']; const r=S.rooms[id]; const p=svgPoint(svg,e);
+    const others=roomList().filter(o=>o.level===r.level&&o.id!==id); const fw=+S.meta.width||0, fd=+S.meta.depth||0;
+    dr={id,mode:rs?'size':'move',sx:p.x,sy:p.y,r:{...r},moved:false,cx:[0,...(fw?[fw]:[]),...others.flatMap(o=>[o.x,o.x+o.w])],cy:[0,...(fd?[fd]:[]),...others.flatMap(o=>[o.y,o.y+o.d])]};
+    svg.setPointerCapture(e.pointerId); e.preventDefault(); });
+  svg.addEventListener('pointermove',e=>{ if(!dr) return; const p=svgPoint(svg,e); const dx=p.x-dr.sx, dy=p.y-dr.sy; if(Math.abs(dx)+Math.abs(dy)>.05) dr.moved=true; if(!dr.moved) return;
+    const r=dr.r; let n;
+    if(dr.mode==='move') n={x:snapAxis(r.x+dx,r.w,dr.cx),y:snapAxis(r.y+dy,r.d,dr.cy),w:r.w,d:r.d};
+    else { const x2=snapEdge(r.x+r.w+dx,dr.cx), y2=snapEdge(r.y+r.d+dy,dr.cy); n={x:r.x,y:r.y,w:Math.max(.5,Math.round((x2-r.x)*100)/100),d:Math.max(.5,Math.round((y2-r.y)*100)/100)}; }
+    n.x=Math.round(n.x*100)/100; n.y=Math.round(n.y*100)/100; dr.n=n;
+    const rect=svg.querySelector(`rect[data-srm="${dr.id}"]`); if(rect){ rect.setAttribute('x',n.x); rect.setAttribute('y',n.y); rect.setAttribute('width',n.w); rect.setAttribute('height',n.d); rect.setAttribute('stroke','var(--accent)'); rect.setAttribute('stroke-width','.1'); rect.setAttribute('fill-opacity','.75'); }
+    const h=svg.querySelector('[data-sres]'); if(h&&UI.setupSel===dr.id){ h.setAttribute('x',n.x+n.w-.18); h.setAttribute('y',n.y+n.d-.18); }
+    svg.querySelectorAll('line,polyline,text').forEach(el=>el.style.opacity=.25); });
+  svg.addEventListener('pointerup',()=>{ if(!dr) return; const d=dr; dr=null; UI._svgDragged=d.moved;
+    if(d.moved&&d.n){ UI.setupSel=d.id; moveRoom(d.id,d.n); toast(`${S.rooms[d.id].name}: ${d.n.x.toFixed(2)}, ${d.n.y.toFixed(2)} m · ${d.n.w.toFixed(2)} × ${d.n.d.toFixed(2)} m`); }
+    else { UI.setupSel=d.id; renderSetup(); } });
 }
 function parseCSV(text){
   const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean); if(!lines.length) return {rows:[],errors:['The CSV is empty.']};
@@ -1296,7 +1319,7 @@ function handleExtraClick(t,e){
   if(t.closest('#expBtn')){ exportPDF(); return true; }
   const sl=t.closest('[data-slevel]'); if(sl){ UI.setupLevel=Number(sl.dataset.slevel); UI.setupSel=null; renderSetup(); return true; }
   const ss=t.closest('[data-ssel]'); if(ss){ UI.setupSel=ss.dataset.ssel; renderSetup(); return true; }
-  const sr=t.closest('[data-srm]'); if(sr){ UI.setupSel=sr.dataset.srm; renderSetup(); return true; }
+  if(t.closest('[data-srm],[data-sres]')) return true;
   const rd=t.closest('[data-rdel]'); if(rd){ const id=rd.dataset.rdel; if(UI.confirmDel===id){ deleteRoom(id); UI.confirmDel=null; if(UI.setupSel===id) UI.setupSel=null; } else { UI.confirmDel=id; renderSetup(); } return true; }
   if(t.closest('#suAddRoom')){ const lv=UI.setupLevel; const rs=roomList().filter(r=>r.level===lv); const y=rs.length?Math.max(...rs.map(r=>r.y+r.d)):0; const id=uid('r'); UI.setupSel=id; saveRoom(id,{name:'New room',level:lv,x:0,y:Math.round(y*100)/100,w:3,d:3,outdoor:false,notes:'',walls:{},images:[],openings:[]}); return true; }
   const oa=t.closest('[data-oadd]'); if(oa){ const r=clone(S.rooms[UI.setupSel]); r.openings=r.openings||[]; r.openings.push({wall:'front',type:oa.dataset.oadd,offset:0.3,width:oa.dataset.oadd==='door'?0.8:oa.dataset.oadd==='window'?1.0:0.9,hinge:'start'}); saveRoom(UI.setupSel,r); return true; }
