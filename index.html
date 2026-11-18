@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f8f9f8">
 <title>House Completion Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -55,6 +56,7 @@ nav.tabs{display:flex;gap:2px;background:var(--paper);border:1px solid var(--lin
 nav.tabs{border-radius:12px}
 nav.tabs button{border:0;background:transparent;padding:6px 11px;border-radius:9px;font:600 13.5px var(--body);color:var(--muted);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 nav.tabs button svg{width:15px;height:15px;flex:none}
+nav.tabs .s{display:none}
 nav.tabs button:hover{color:var(--ink)}
 nav.tabs button[aria-current="page"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
 .btn{border:1px solid var(--line);background:var(--panel);padding:6px 13px;border-radius:9px;font-weight:600;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
@@ -168,7 +170,7 @@ textarea{resize:vertical}
 .tl-wrap{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:calc(100vh - 230px)}
 .tl{position:relative;min-width:100%}
 .tl-head{position:sticky;top:0;z-index:3;background:var(--panel);display:flex;border-bottom:1px solid var(--line)}
-.tl-head .lab,.tl-row .lab{position:sticky;left:0;z-index:2;background:var(--panel);width:240px;flex:none;padding:5px 10px;border-right:1px solid var(--line);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-head .lab,.tl-row .lab{position:sticky;left:0;z-index:2;background:var(--panel);width:var(--lw,240px);flex:none;padding:5px 10px;border-right:1px solid var(--line);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tl-track{position:relative;flex:none}
 .tl-head .wk{position:absolute;top:0;bottom:0;font:500 10.5px var(--mono);color:var(--muted);padding:6px 4px;border-left:1px solid var(--line);white-space:nowrap}
 .tl-row{display:flex;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);min-height:30px}
@@ -277,6 +279,8 @@ textarea{resize:vertical}
 .dbl [data-dev]{cursor:grab}
 .dbl [data-dev].dragging{cursor:grabbing;opacity:.85}
 .devbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+/* Phone-only status switch */
+.mcols{display:none}
 /* Furniture */
 .flib{display:grid;grid-template-columns:1fr;gap:3px;max-height:360px;overflow:auto;padding-right:2px}
 .fitem{display:grid;grid-template-columns:12px 1fr auto;gap:6px;align-items:center;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:4px 6px;font-size:12px;text-align:left}
@@ -311,7 +315,7 @@ textarea{resize:vertical}
 .export{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;background:var(--paper)}
 .export label{display:flex;gap:8px;align-items:center;font-size:13px}
 
-@media (max-width:1360px){ nav.tabs button span{display:none} nav.tabs button[aria-current="page"] span{display:inline} nav.tabs button{padding:6px 9px} }
+@media (max-width:1360px) and (min-width:761px){ nav.tabs button .l{display:none} nav.tabs button[aria-current="page"] .l{display:inline} nav.tabs button{padding:6px 9px} }
 @media (max-width:980px){
   .elec-grid{grid-template-columns:1fr}
   .checks{position:static;max-height:none}
@@ -332,7 +336,62 @@ textarea{resize:vertical}
   nav.tabs{margin-left:0;overflow-x:auto;max-width:100%}
   .board{grid-template-columns:repeat(4,minmax(240px,1fr))}
 }
-@media (max-width:480px){ .grid2,.grid3{grid-template-columns:1fr} .top{gap:10px} }
+@media (max-width:760px){
+  body{display:block;overflow:auto;padding-bottom:calc(70px + env(safe-area-inset-bottom))}
+  .top{position:sticky;top:0;z-index:30;padding:calc(8px + env(safe-area-inset-top)) 14px 8px;gap:10px;flex-wrap:nowrap;box-shadow:0 1px 0 var(--line)}
+  .brand{min-width:0;flex:1}.brand h1{font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.brand .sub{display:none}
+  .overall{min-width:0;max-width:none;flex:0 0 118px;grid-template-columns:auto 1fr;gap:2px 6px}
+  .overall .pct{font-size:20px}.overall .meta{display:none}.overall .bar{height:6px}
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:40;margin:0;border-radius:0;border:0;border-top:1px solid var(--line);background:color-mix(in srgb,var(--panel) 94%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding:4px 2px calc(4px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(8,1fr);max-width:none;overflow:visible}
+  nav.tabs button{flex-direction:column;gap:2px;padding:6px 0;font-size:10px;border-radius:8px}
+  nav.tabs button svg{width:20px;height:20px}
+  nav.tabs .l{display:none!important} nav.tabs .s{display:block}
+  nav.tabs button[aria-current="page"]{box-shadow:none;background:var(--accent-soft);color:var(--accent)}
+  #newTaskBtn{position:fixed;right:16px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:39;width:52px;height:52px;border-radius:50%;padding:0;justify-content:center;font-size:0;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+  #newTaskBtn::before{content:"+";font-size:28px;line-height:1;font-weight:400}
+  body[data-view="plans"] #newTaskBtn,body[data-view="setup"] #newTaskBtn,body[data-view="electrical"] #newTaskBtn,body[data-view="budget"] #newTaskBtn,body[data-view="dump"] #newTaskBtn{display:none}
+  .page{padding:12px}
+  .stage-tools{flex-wrap:nowrap;overflow-x:auto;padding:8px 10px;scrollbar-width:none}
+  .stage-tools::-webkit-scrollbar{display:none}
+  .seg{flex:none}
+  #stage{height:56vh;min-height:320px}
+  .stage-foot .hint{display:none}
+  .legend{font-size:11px;padding:4px 8px;max-width:75%}
+  .toolbar{gap:6px}
+  .toolbar .inp[type=search]{width:100%!important}
+  .sector-filter{flex-wrap:nowrap;overflow-x:auto;width:100%;padding-bottom:2px;scrollbar-width:none}
+  .sector-filter button{flex:none}
+  .mcols{display:flex!important;width:100%;overflow-x:auto}
+  .mcols button{flex:1;white-space:nowrap}
+  .board{grid-template-columns:1fr!important;overflow:visible}
+  .board[data-m="todo"] .col:not([data-col="todo"]),.board[data-m="doing"] .col:not([data-col="doing"]),.board[data-m="waiting"] .col:not([data-col="waiting"]),.board[data-m="done"] .col:not([data-col="done"]){display:none}
+  .col header{display:none}
+  .tl-wrap{max-height:none}
+  .plans{display:flex;flex-direction:column;height:auto}
+  .plan-stage{order:-1;height:62vh;min-height:360px}
+  .plans aside{padding:12px}
+  .plans aside:not(.right) .pl-level{order:1}.plans aside:not(.right) .pl-tools{order:2}.plans aside:not(.right) .pl-show{order:3}.plans aside:not(.right) .pl-circ{order:4}.plans aside:not(.right) .pl-export{order:5}
+  .plans aside.right{order:1}
+  .tools{grid-template-columns:repeat(3,1fr)}.tools .wide,.tool-h{grid-column:span 3}
+  .sel-card{position:fixed;left:8px;right:8px;bottom:calc(72px + env(safe-area-inset-bottom));max-height:46vh;overflow:auto;z-index:45;background:var(--panel);box-shadow:0 -8px 30px rgba(0,0,0,.28);border-radius:14px!important}
+  .egrid{grid-template-columns:1fr 1fr}
+  .elec-grid{gap:12px}
+  .card{padding:12px}
+  .btbl th:nth-child(3),.btbl td:nth-child(3),.btbl th:nth-child(4),.btbl td:nth-child(4){display:none}
+  #main .btbl tr[data-circ] td:nth-child(5),#main .btbl tr[data-circ] td:nth-child(6),#main .btbl tr[data-circ] td:nth-child(8){display:none}
+  .tiles{gap:8px}.tile{padding:10px}.tile .v{font-size:21px}
+  .budget-grid{gap:10px}
+  .overlay{align-items:flex-end;padding:0}
+  .modal{width:100%!important;max-height:92vh;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+  .grid3{grid-template-columns:1fr 1fr}
+  .quote{grid-template-columns:auto 1fr 90px auto}
+  .setup .form{padding:12px}
+  #toast{bottom:calc(84px + env(safe-area-inset-bottom));max-width:90vw;text-align:center}
+  .plan-tools{right:12px;top:12px}
+  .dump textarea{min-height:140px}
+  .prop-tbl{font-size:12.5px}
+}
+@media (max-width:480px){ .grid2,.grid3{grid-template-columns:1fr 1fr} .sel-card .grid3{grid-template-columns:repeat(3,1fr)} .top{gap:10px} }
 @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
 </style>
 </head>
@@ -341,14 +400,14 @@ textarea{resize:vertical}
   <div class="brand"><h1 id="houseName">House</h1><span class="sub" id="houseSub">3 levels</span></div>
   <div class="overall" id="overall"></div>
   <nav class="tabs" id="tabs" aria-label="Views">
-    <button data-view="house" title="House" aria-label="House"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><span>House</span></button>
-    <button data-view="tasks" title="Tasks" aria-label="Tasks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 12l3 3 5-6"/></svg><span>Tasks</span></button>
-    <button data-view="timeline" title="Timeline" aria-label="Timeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h8"/><circle cx="17" cy="6" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg><span>Timeline</span></button>
-    <button data-view="plans" title="Plans" aria-label="Plans"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h9v9M12 3v5"/></svg><span>Plans</span></button>
-    <button data-view="electrical" title="Electrical" aria-label="Electrical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><span>Electrical</span></button>
-    <button data-view="budget" title="Budget" aria-label="Budget"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 7a6 6 0 1 0 0 10"/><path d="M4 10h9M4 14h9"/></svg><span>Budget</span></button>
-    <button data-view="dump" title="Brain dump" aria-label="Brain dump"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg><span>Brain dump</span></button>
-    <button data-view="setup" title="Setup" aria-label="Setup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span>Setup</span></button>
+    <button data-view="house" title="House" aria-label="House"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><span class="l">House</span><span class="s">Home</span></button>
+    <button data-view="tasks" title="Tasks" aria-label="Tasks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 12l3 3 5-6"/></svg><span class="l">Tasks</span><span class="s">Tasks</span></button>
+    <button data-view="timeline" title="Timeline" aria-label="Timeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h8"/><circle cx="17" cy="6" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg><span class="l">Timeline</span><span class="s">Dates</span></button>
+    <button data-view="plans" title="Plans" aria-label="Plans"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h9v9M12 3v5"/></svg><span class="l">Plans</span><span class="s">Plans</span></button>
+    <button data-view="electrical" title="Electrical" aria-label="Electrical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><span class="l">Electrical</span><span class="s">Power</span></button>
+    <button data-view="budget" title="Budget" aria-label="Budget"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 7a6 6 0 1 0 0 10"/><path d="M4 10h9M4 14h9"/></svg><span class="l">Budget</span><span class="s">Budget</span></button>
+    <button data-view="dump" title="Brain dump" aria-label="Brain dump"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg><span class="l">Brain dump</span><span class="s">Ideas</span></button>
+    <button data-view="setup" title="Setup" aria-label="Setup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span class="l">Setup</span><span class="s">Setup</span></button>
   </nav>
   <button class="btn primary" id="newTaskBtn" type="button">+ New task</button>
 </header>
@@ -472,6 +531,7 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const clone=o=>JSON.parse(JSON.stringify(o||{}));
+const isPhone=()=>matchMedia('(max-width:760px)').matches;
 const todayISO=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 const toDate=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
 const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
@@ -774,7 +834,8 @@ function renderTasks(){
    <div class="toolbar"><input class="inp" id="tq" type="search" placeholder="Search tasks" value="${esc(UI.tf.q)}" style="width:220px" aria-label="Search tasks">
     <select class="inp" id="troom" aria-label="Room"><option value="">All rooms</option><option value="none" ${UI.tf.room==='none'?'selected':''}>No room</option>${roomList().map(r=>`<option value="${r.id}" ${UI.tf.room===r.id?'selected':''}>${esc(r.name)} (${LEVELS[r.level].split(' ')[0]})</option>`).join('')}</select>
     <div class="sector-filter">${SECTORS.map(s=>`<button type="button" data-tsec="${s.key}" aria-pressed="${UI.tf.sectors.includes(s.key)}"><i class="dot" style="background:${s.color}"></i>${esc(s.label)}</button>`).join('')}</div></div>
-   <div class="board">${STATUSES.map(st=>{let list=ts.filter(t=>t.status===st.key);
+   <div class="seg mcols" role="tablist" aria-label="Status">${STATUSES.map(st=>`<button type="button" data-mcol="${st.key}" aria-pressed="${(UI.mcol||"todo")===st.key}">${st.label} <span class="num">${ts.filter(t=>t.status===st.key).length}</span></button>`).join("")}</div>
+   <div class="board" data-m="${UI.mcol||"todo"}">${STATUSES.map(st=>{let list=ts.filter(t=>t.status===st.key);
      if(st.key==='done') list.sort((a,b)=>(b.doneAt||0)-(a.doneAt||0)); else list.sort((a,b)=>((b.priority==='high')-(a.priority==='high'))||(a.due||'9999').localeCompare(b.due||'9999'));
      const shown=st.key==='done'&&!UI.showAllDone?list.slice(0,25):list;
      return `<div class="col" data-col="${st.key}"><header><h2>${st.label}</h2><span class="muted num">${list.length}</span></header><div class="cards">${shown.map(card).join('')||'<div class="empty" style="padding:4px">Drop tasks here</div>'}${shown.length<list.length?`<button class="btn small" type="button" id="showDone">Show all ${list.length}</button>`:''}</div></div>`}).join('')}</div></div>`;
@@ -789,17 +850,17 @@ function renderTimeline(){
   const dates=[today]; sched.forEach(t=>{ if(validISO(t.start)) dates.push(t.start); if(validISO(t.due)) dates.push(t.due); }); if(validISO(S.meta.target)) dates.push(S.meta.target);
   dates.sort(); let from=addDays(dates[0],-7); let to=addDays(dates[dates.length-1],21); if(daysBetween(from,to)<84) to=addDays(from,84);
   const d0=toDate(from); const shift=(d0.getDay()+6)%7; from=addDays(from,-shift);
-  const days=daysBetween(from,to); const px=Math.max(7,Math.min(22,Math.floor(((($('#main').clientWidth||1000)-300)/days)))); const TW=days*px;
+  const LW=isPhone()?120:240; const days=daysBetween(from,to); const px=Math.max(7,Math.min(22,Math.floor(((($('#main').clientWidth||1000)-LW-60)/days)))); const TW=days*px;
   const xOf=s=>daysBetween(from,s)*px;
   let wk=''; for(let i=0;i<=days;i+=7){ const ds=addDays(from,i); wk+=`<div class="wk" style="left:${i*px}px">${fmtD(ds)}</div>`; }
-  let grid=''; for(let i=0;i<=days;i+=7) grid+=`<div class="tl-grid" style="left:${240+i*px}px"></div>`;
+  let grid=''; for(let i=0;i<=days;i+=7) grid+=`<div class="tl-grid" style="left:${LW+i*px}px"></div>`;
   let rows='';
   for(const s of SECTORS){ const list=sched.filter(t=>t.sector===s.key).sort((a,b)=>(a.start||a.due).localeCompare(b.start||b.due)); if(!list.length) continue;
     rows+=`<div class="tl-row grp"><div class="lab"><i class="dot" style="background:${s.color}"></i>${esc(s.label)}</div><div class="tl-track" style="width:${TW}px"></div></div>`;
     for(const t of list){ const st=validISO(t.start)?t.start:addDays(t.due,-Math.max(1,Math.round(t.estDays||1))+1); const en=validISO(t.due)?t.due:addDays(st,Math.max(1,Math.round(t.estDays||1))-1);
       const L=xOf(st), Wd=Math.max(px,(daysBetween(st,en)+1)*px);
       rows+=`<div class="tl-row"><div class="lab" title="${esc(t.title)}">${esc(t.title)}${t.roomId?` <span class="muted">· ${esc(roomName(t.roomId))}</span>`:''}</div><div class="tl-track" style="width:${TW}px"><div class="tl-bar${t.status==='done'?' done':''}${t._p?' prop':''}" data-open-task="${t.id}" style="left:${L}px;width:${Wd}px;--c:${s.color}" title="${esc(t.title)}: ${fmtD(st)} – ${fmtD(en)}">${Wd>60?esc(t.title):''}</div></div></div>`; } }
-  const lines=`<div class="tl-line" style="left:${240+xOf(today)}px"><span>Today</span></div>`+(validISO(S.meta.target)?`<div class="tl-line target" style="left:${240+xOf(S.meta.target)}px"><span style="color:var(--bad)">Target</span></div>`:'');
+  const lines=`<div class="tl-line" style="left:${LW+xOf(today)}px"><span>Today</span></div>`+(validISO(S.meta.target)?`<div class="tl-line target" style="left:${LW+xOf(S.meta.target)}px"><span style="color:var(--bad)">Target</span></div>`:'');
   $('#main').innerHTML=`<div class="page">
    <div class="toolbar">
      <label class="f" for="tlTarget">Target finish date<input id="tlTarget" type="date" value="${esc(S.meta.target||'')}"></label>
@@ -808,7 +869,7 @@ function renderTimeline(){
      ${prop?`<span style="align-self:flex-end;display:flex;gap:6px"><button class="btn primary" type="button" id="tlApply">Apply ${Object.keys(prop).length} dates</button><button class="btn" type="button" id="tlDiscard">Discard</button></span>`:''}
    </div>
    ${UI.tl.note?`<div class="ai-out">${esc(UI.tl.note)}</div>`:''}
-   ${sched.length?`<div class="tl-wrap"><div class="tl" style="width:${240+TW}px">${grid}${lines}<div class="tl-head"><div class="lab muted">Task</div><div class="tl-track" style="width:${TW}px;height:28px">${wk}</div></div>${rows}</div></div>`:'<div class="empty">No dated tasks yet. Give tasks a start or due date, or let AI plan them against your target date.</div>'}
+   ${sched.length?`<div class="tl-wrap"><div class="tl" style="width:${LW+TW}px;--lw:${LW}px">${grid}${lines}<div class="tl-head"><div class="lab muted">Task</div><div class="tl-track" style="width:${TW}px;height:28px">${wk}</div></div>${rows}</div></div>`:'<div class="empty">No dated tasks yet. Give tasks a start or due date, or let AI plan them against your target date.</div>'}
    ${unsched.length?`<section><h2 style="font-size:15px;margin-bottom:6px">Not scheduled yet (${unsched.length})</h2><div style="display:flex;flex-wrap:wrap;gap:6px">${unsched.map(t=>`<button type="button" class="chip" data-open-task="${t.id}" style="cursor:pointer"><i class="dot" style="background:${SEC[t.sector]?.color||'#999'}"></i>${esc(t.title)}</button>`).join('')}</div></section>`:''}
   </div>`;
 }
@@ -1148,16 +1209,16 @@ function renderPlans(){
   const H3=t=>`<h3 style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">${t}</h3>`;
   $('#main').innerHTML=`<section class="plans">
    <aside>
-     <div>${H3('Level')}<div class="seg">${LEVELS.map((l,i)=>`<button type="button" data-plevel="${i}" aria-pressed="${lv===i}">${l.split(' ')[0]}</button>`).join('')}</div></div>
-     <div>${H3('Show')}${[['furniture','Furniture'],['walls','Wall works'],['electrical','Electrical & lighting'],['plumbing','Plumbing & gas']].map(([k,l])=>`<label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:2px 0"><input type="checkbox" data-player="${k}" ${UI.planLayers[k]?'checked':''}>${l}</label>`).join('')}
+     <div class="pl-level">${H3('Level')}<div class="seg">${LEVELS.map((l,i)=>`<button type="button" data-plevel="${i}" aria-pressed="${lv===i}">${l.split(' ')[0]}</button>`).join('')}</div></div>
+     <div class="pl-show">${H3('Show')}${[['furniture','Furniture'],['walls','Wall works'],['electrical','Electrical & lighting'],['plumbing','Plumbing & gas']].map(([k,l])=>`<label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:2px 0"><input type="checkbox" data-player="${k}" ${UI.planLayers[k]?'checked':''}>${l}</label>`).join('')}
        <label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:2px 0"><input type="checkbox" id="plByCirc" ${UI.planByCirc!==false?'checked':''}>Colour points by circuit</label>
        <label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:2px 0"><input type="checkbox" id="plHeights" ${UI.planHeights!==false?'checked':''}>Show mounting heights</label></div>
-     ${UI.planLayers.electrical?circuitFilterHTML(lv):''}
-     <div>${H3('Place a point')}<div class="tools"><button type="button" data-tool="select" aria-pressed="${UI.tool==='select'}" class="wide"><span class="glyph" style="--c:var(--muted)">↖</span>Select / move</button>
+     ${UI.planLayers.electrical?`<div class="pl-circ">${circuitFilterHTML(lv)}</div>`:''}
+     <div class="pl-tools">${H3('Place a point')}<div class="tools"><button type="button" data-tool="select" aria-pressed="${UI.tool==='select'}" class="wide"><span class="glyph" style="--c:var(--muted)">↖</span>Select / move</button>
      ${[['Power & data',['socket','switch','data','ac','fan','alarm','cu']],['Lighting',['light']],['Plumbing & gas',['cold','hot','waste','gas']]].map(([h,keys])=>`<div class="tool-h">${h}</div>`+PTYPES.filter(p=>keys.includes(p.key)&&(p.key!=='cu'||pointList().some(q=>q.type==='cu'))).map(p=>`<button type="button" data-tool="${p.key}" aria-pressed="${UI.tool===p.key}" title="${esc(p.label)}"><span class="glyph" style="--c:${SEC[p.sector].color}">${p.g}</span>${esc(p.label.replace(' / CO alarm','').replace('Smoke / heat','Alarm'))}</button>`).join('')).join('')}
      <div class="tool-h">Furniture & fittings</div><button type="button" class="wide" data-tool="furn" aria-pressed="${UI.tool==='furn'}"><span class="glyph" style="--c:#b07a3c">▭</span>Furniture library…</button></div>
      ${UI.tool==='furn'?furnLibrary():''}</div>
-     <div class="export">${H3('Export PDF drawings')}
+     <div class="export pl-export">${H3('Export PDF drawings')}
        ${[['arch','Architectural'],['elec','Electrical & lighting'],['db','Distribution board schedules'],['plumb','Plumbing & gas'],['walls','Wall works']].map(([k,l])=>`<label><input type="checkbox" data-expd="${k}" ${UI.exp.disc[k]?'checked':''}>${l}</label>`).join('')}
        <div class="muted" style="font-size:11.5px;margin-top:4px">Levels</div>
        ${LEVELS.map((l,i)=>`<label><input type="checkbox" data-expl="${i}" ${UI.exp.levels[i]?'checked':''}>${l}</label>`).join('')}
@@ -1167,7 +1228,7 @@ function renderPlans(){
    <div class="plan-stage" id="planStage"><svg id="planSvg" class="${UI.tool!=='select'?'placing':''}" data-vb="${vb.join(' ')}" viewBox="${planViewBox(vb).join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${LEVELS[lv]} plan">${svg}</svg>
      <div class="plan-tools"><button type="button" id="pzIn" title="Zoom in" aria-label="Zoom in">+</button><button type="button" id="pzOut" title="Zoom out" aria-label="Zoom out">−</button><button type="button" id="pzFit" title="Fit plan" aria-label="Fit plan">⤢</button><span class="zl" id="pzLabel">${Math.round((UI.pz?.k||1)*100)}%</span><button type="button" id="pzUndo" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">↶</button></div></div>
    <aside class="right">
-     ${UI.furnSel&&S.furniture[UI.furnSel]?furnEditor({id:UI.furnSel,...S.furniture[UI.furnSel]}):selP?`<div style="display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px"><div style="display:flex;gap:8px;align-items:center"><span class="glyph" style="--c:${SEC[PT[selP.type].sector].color}">${esc(ptGlyph(selP))}</span><b>${esc(ptLabel(selP))}</b><span class="muted">· ${esc(roomName(selP.roomId))}</span></div>
+     ${UI.furnSel&&S.furniture[UI.furnSel]?furnEditor({id:UI.furnSel,...S.furniture[UI.furnSel]}):selP?`<div class="sel-card" style="display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px"><div style="display:flex;gap:8px;align-items:center"><span class="glyph" style="--c:${SEC[PT[selP.type].sector].color}">${esc(ptGlyph(selP))}</span><b>${esc(ptLabel(selP))}</b><span class="muted">· ${esc(roomName(selP.roomId))}</span></div>
        ${(VARIANTS[selP.type]||[]).length?`<label class="f" for="ptVar">Type<select id="ptVar">${VARIANTS[selP.type].map(v=>`<option value="${v.k}" ${selP.variant===v.k?'selected':''}>${esc(v.l)}</option>`).join('')}</select></label>`:''}
        <label class="f" for="ptH">Height above finished floor (mm)<input id="ptH" type="number" min="0" step="10" value="${esc(selP.height??'')}" placeholder="e.g. 450"></label>
        <div style="display:flex;gap:4px;flex-wrap:wrap">${[150,300,450,1100,1200,1800,2100].map(h=>`<button type="button" class="btn small" data-ph="${h}">${h}</button>`).join('')}<button type="button" class="btn small" data-ph="ceil">Ceiling</button></div>
@@ -1509,6 +1570,7 @@ async function buildPDF(discs,lvls){
 
 /* ---------- Extra event handlers ---------- */
 function handleExtraClick(t,e){
+  const mc=t.closest('[data-mcol]'); if(mc){ UI.mcol=mc.dataset.mcol; renderTasks(); return true; }
   if(handleFurnClick(t)) return true;
   if(t.closest('#pzIn')){ zoomPlanAt(1.4); return true; }
   if(t.closest('#pzOut')){ zoomPlanAt(1/1.4); return true; }
@@ -1976,7 +2038,7 @@ function furn3D(r,b){ let h=''; for(const f of furnList().filter(f=>f.roomId===r
     h+=`<div class="fb" style="left:${cx-w/2}px;top:${cy-d/2}px;width:${w}px;height:${d}px;transform:translateZ(${z+1}px) rotateZ(${+f.rot||0}deg)">${side(0,0,w,0)}${side(w,0,d,90)}${side(w,d,w,180)}${side(0,d,d,270)}<div class="fbt" style="background:${c};transform:translateZ(${H}px)"></div></div>`; }
   return h; }
 function furnEditor(f){ const k=FK[f.kind]||{};
-  return `<div style="display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px">
+  return `<div class="sel-card" style="display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px">
    <div style="display:flex;gap:8px;align-items:center"><i style="width:16px;height:16px;border-radius:4px;background:${fFill(f)};border:1px solid var(--ink);flex:none"></i><b>${esc(f.label||k.l||'Item')}</b><span class="muted">· ${esc(roomName(f.roomId))}</span></div>
    <label class="f" for="fuLabel">Name<input id="fuLabel" value="${esc(f.label||'')}" placeholder="${esc(k.l||'')}"></label>
    <div class="grid3"><label class="f" for="fuW">Width (mm)<input id="fuW" type="number" min="50" step="10" value="${f.w}"></label><label class="f" for="fuD">Depth (mm)<input id="fuD" type="number" min="20" step="10" value="${f.d}"></label><label class="f" for="fuH">Height (mm)<input id="fuH" type="number" min="10" step="10" value="${f.h}"></label></div>
@@ -2010,13 +2072,13 @@ document.addEventListener('input',e=>{ if(e.target.id==='furnQ'){ UI.furnQ=e.tar
 
 /* ---------- Routing ---------- */
 const VIEWS=['house','tasks','timeline','plans','electrical','budget','dump','setup'];
-function go(v){ UI.view=v; if(location.hash!=='#'+v) history.replaceState(null,'','#'+v); const a=document.activeElement; a&&a.blur&&a.blur(); deferred=false; $('#main').innerHTML=''; render(); }
+function go(v){ UI.view=v; document.body.dataset.view=v; if(location.hash!=='#'+v) history.replaceState(null,'','#'+v); const a=document.activeElement; a&&a.blur&&a.blur(); deferred=false; $('#main').innerHTML=''; render(); }
 window.addEventListener('hashchange',()=>{ const h=location.hash.slice(1); if(VIEWS.includes(h)&&h!==UI.view) go(h); });
 window.addEventListener('resize',()=>{ if(UI.view==='house'&&UI.dim==='3d'){ UI.zoom=null; build3D(); } });
 
 /* ---------- Boot ---------- */
 (async function boot(){
-  const h=location.hash.slice(1); if(VIEWS.includes(h)) UI.view=h;
+  const h=location.hash.slice(1); if(VIEWS.includes(h)) UI.view=h; document.body.dataset.view=UI.view;
   render();
   await store.init();
   store.watch('rooms',o=>{S.rooms=o; S.loaded.rooms=true; scheduleRender();});
