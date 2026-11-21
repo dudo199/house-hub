@@ -1,13 +1,14 @@
 # House Completion Hub
 
-A single-page project hub for finishing a 3-level townhouse: a 3D / 2D model of the house, tasks by trade and room, a timeline, electrical and plumbing plans with PDF export, wall works, and a budget with supplier quotes.
+A single-page project hub for finishing a 3-level townhouse: a 3D / 2D model of the house, tasks by trade and room, a timeline, floor plans with furniture, electrical and plumbing points, distribution boards and circuits with BS 7671 checks, PDF drawings, wall works, and a budget with supplier quotes.
 
-## Where it runs
+## Two ways to open it
 
-The live app is hosted as a Claude artifact. It relies on Claude's page features for its online database, AI task splitting and planning, uploads, dictation and downloads, so opening `index.html` straight from GitHub shows the app in preview mode without saved data.
+- **In Claude** (main version, with AI features): the hub's Claude artifact link.
+- **On GitHub Pages**: https://dudo199.github.io/house-hub/ — the same app. It saves to the private repo `dudo199/house-hub-data` (file `sync/github.json`) using a fine-grained GitHub access key you paste in once per device. AI features (Brain dump, Plan my dates, next steps) and photo uploads only work in Claude.
 
-This repository is the code backup and version history. House data is backed up separately, in a private repository, using **Setup → Back up or restore all data**.
+A scheduled task keeps the two in step about once an hour. Where the same item was changed in both, the newer change wins.
 
 ## Files
 
-- `index.html`: the whole app (HTML, CSS and JavaScript in one file).
+- `index.html`: the whole app (HTML, CSS and JavaScript in one file). Contains no house data.

@@ -551,7 +551,8 @@ const store={db:null,mem:{rooms:{},tasks:{},points:{},items:{},boards:{},circuit
   async init(){
     let use=null;
     for(let i=0;i<20&&!use;i++){ if(window.claude&&typeof window.claude.use==='function') use=window.claude.use; else await new Promise(r=>setTimeout(r,100)); }
-    if(!use){ setBanner('Preview mode: changes are not saved here. Open the published page to keep your data.'); return; }
+    if(!use){ if(/github\.io$/.test(location.hostname)||/[?&]gh=1/.test(location.search)){ CAP.downloads={save:async({filename,data})=>{ const blob=data instanceof Blob?data:new Blob([data]); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1500); return {status:'saved'}; }}; this.ghPending=true; return; }
+      setBanner('Preview mode: changes are not saved here. Open the published page to keep your data.'); return; }
     try{ this.db=await window.claude.use('db'); }catch(e){ this.db=null; }
     if(!this.db) setBanner('Saving is unavailable in this view, so changes last only until you close the page.');
     const get=n=>window.claude.use(n).catch(()=>null);
@@ -575,12 +576,14 @@ const store={db:null,mem:{rooms:{},tasks:{},points:{},items:{},boards:{},circuit
   },
   _q(path,fn){ const p=(this.queues[path]||Promise.resolve()).then(fn).catch(e=>{ console.error(e); toast(e&&e.code==='quota_exceeded'?'Storage is full: delete some items and try again.':'Could not save that change. Try again.'); }); this.queues[path]=p; return p; },
   put(col,id,data){
+    if(gh.on){ data={...data,_u:Date.now()}; delete gh.tomb[col+'/'+id]; }
     undo.rec(col,id,col==='meta'?S.meta:S[col][id]);
     if(col!=='meta'){ S[col][id]=data; } else { S.meta={...S.meta,...data}; }
     scheduleRender();
     const path=col+'/'+id;
     if(this.db) return this._q(path,()=>this.db.doc(path).set(data));
     this.mem[col][id]=data; (this.subs[col]||[]).forEach(cb=>cb({...this.mem[col]})); (this.subs[path]||[]).forEach(cb=>cb(data));
+    if(gh.on) gh.dirty();
   },
   del(col,id){
     undo.rec(col,id,S[col][id]);
@@ -588,6 +591,7 @@ const store={db:null,mem:{rooms:{},tasks:{},points:{},items:{},boards:{},circuit
     const path=col+'/'+id;
     if(this.db) return this._q(path,()=>this.db.doc(path).delete());
     delete this.mem[col][id]; (this.subs[col]||[]).forEach(cb=>cb({...this.mem[col]}));
+    if(gh.on){ gh.tomb[path]=Date.now(); gh.dirty(); }
   }
 };
 function setBanner(t){const b=$('#banner'); b.textContent=t; b.dataset.slow=t.startsWith('Your saved data')?'1':'';}
@@ -632,7 +636,7 @@ function render(){
 function renderTop(){
   $('#houseName').textContent=S.meta.name||'My house';
   const rooms=roomList(); const p=progress(items());
-  $('#houseSub').textContent=`${LEVELS.length} levels · ${rooms.length} rooms`;
+  const hs=$('#houseSub'); hs.textContent=hs.dataset.sync?hs.dataset.sync:`${LEVELS.length} levels · ${rooms.length} rooms`; hs.style.color=gh.err?'var(--bad)':'';
   let meta=`${p.done} of ${p.total} items done`;
   if(S.meta.target){ const d=daysBetween(todayISO(),S.meta.target); meta+= d>=0?` · ${Math.ceil(d/7)} weeks to target (${fmtD(S.meta.target)})`:` · target date passed`; }
   $('#overall').innerHTML=`<div class="pct num">${p.pct??0}%</div><div class="bar" title="Overall progress"><i style="width:${p.pct??0}%"></i></div><div class="meta num">${esc(meta)}</div>`;
@@ -1317,6 +1321,7 @@ function renderSetup(){
      ${UI.restore?`<div class="export"><b style="font-size:13px">Restore ${esc(UI.restore.name)}</b><span style="font-size:12.5px">Backup from ${esc(UI.restore.when)}: ${UI.restore.counts}. This replaces everything currently in the hub.</span>
        <div style="display:flex;gap:6px"><button class="btn danger small" type="button" id="bkGo">${UI.restore.sure?'Click again to replace everything':'Replace with this backup'}</button><button class="btn small" type="button" id="bkCancel">Cancel</button></div></div>`:''}
    </section>
+   ${syncSetupHTML()}
    <section style="border-top:1px solid var(--line);padding-top:14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" type="button" id="suDone">${m.setupDone?'Done, back to house':'Finish setup'}</button>${m.setupDone?'<span class="okline">Setup complete. Changes save as you make them.</span>':'<span class="muted" style="font-size:12.5px">Changes save as you make them.</span>'}</div></section>
   </div>
   <div class="preview"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>${LEVELS[lv]} · live preview <button class="btn small" type="button" data-undo style="margin-left:6px">↶ Undo</button></h2><span class="muted" style="font-size:12px">Dashed outline = house footprint · click a room to edit its doors and windows</span></div>
@@ -1570,6 +1575,8 @@ async function buildPDF(discs,lvls){
 
 /* ---------- Extra event handlers ---------- */
 function handleExtraClick(t,e){
+  if(t.closest('#ghNow')){ (gh.pending?gh.push():gh.pull()).then(()=>toast(gh.err||'Synced.')); return true; }
+  if(t.closest('#ghOff')){ if(t.dataset.sure){ gh.setCfg({repo:gh.repo}); try{ localStorage.removeItem('hh-gh-cache'); }catch(_){} location.reload(); } else { t.dataset.sure='1'; t.textContent='Click again to remove'; } return true; }
   const mc=t.closest('[data-mcol]'); if(mc){ UI.mcol=mc.dataset.mcol; renderTasks(); return true; }
   if(handleFurnClick(t)) return true;
   if(t.closest('#pzIn')){ zoomPlanAt(1.4); return true; }
@@ -2070,6 +2077,72 @@ function handleFurnChange(t){
 }
 document.addEventListener('input',e=>{ if(e.target.id==='furnQ'){ UI.furnQ=e.target.value; clearTimeout(window._fq); window._fq=setTimeout(()=>{ const pos=e.target.selectionStart; const box=document.querySelector('.flib'); if(box){ const tmp=document.createElement('div'); tmp.innerHTML=furnLibrary(); box.replaceWith(tmp.firstElementChild); const n=$('#furnQ'); n.focus(); try{n.setSelectionRange(pos,pos);}catch(_){} } },200); } });
 
+/* ---------- GitHub sync (used when the hub runs outside Claude, e.g. on GitHub Pages) ---------- */
+const SYNC_COLS=['rooms','tasks','points','items','boards','circuits','furniture'];
+const gh={on:false,repo:'dudo199/house-hub-data',token:'',sha:null,tomb:{},timer:null,saving:false,pending:false,lastOk:0,err:'',
+  cfg(){ try{ return JSON.parse(localStorage.getItem('hh-gh')||'{}'); }catch(_){ return {}; } },
+  setCfg(c){ try{ localStorage.setItem('hh-gh',JSON.stringify(c)); }catch(_){} },
+  api(path,opt={}){ return fetch('https://api.github.com/repos/'+this.repo+'/contents/'+path,{...opt,cache:'no-store',headers:{Authorization:'Bearer '+this.token,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',...(opt.headers||{})}}); },
+  b64e(str){ const b=new TextEncoder().encode(str); let s=''; for(let i=0;i<b.length;i+=0x8000) s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000)); return btoa(s); },
+  b64d(b64){ const bin=atob(b64.replace(/\s/g,'')); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return new TextDecoder().decode(u); },
+  async fetchFile(path){ const r=await this.api(path+'?ref=main'); if(r.status===404) return null; if(r.status===401||r.status===403) throw new Error('auth'); if(!r.ok) throw new Error('GitHub '+r.status);
+    const j=await r.json(); let text=j.content?this.b64d(j.content):null;
+    if(text==null){ const r2=await fetch(j.git_url,{headers:{Authorization:'Bearer '+this.token,Accept:'application/vnd.github.raw'}}); text=await r2.text(); }
+    return {json:JSON.parse(text),sha:j.sha}; },
+  docs(){ const d={}; for(const c of SYNC_COLS) for(const [id,v] of Object.entries(store.mem[c]||{})) d[c+'/'+id]=v; if(store.mem.meta.house) d['meta/house']=store.mem.meta.house; return d; },
+  merge(remote){ const L=this.docs(), R=remote.docs||{}; const tomb={...(remote.tomb||{})}; for(const [k,t] of Object.entries(this.tomb)) tomb[k]=Math.max(tomb[k]||0,t);
+    const out={}; for(const k of new Set([...Object.keys(L),...Object.keys(R)])){ const a=L[k], b=R[k]; const pick=!a?b:!b?a:((+a._u||0)>=(+b._u||0)?a:b); if(pick&&(+pick._u||0)>(tomb[k]||0)) out[k]=pick; }
+    const cut=Date.now()-45*864e5; for(const k of Object.keys(tomb)) if(tomb[k]<cut) delete tomb[k];
+    return {docs:out,tomb}; },
+  apply(m){ this.tomb=m.tomb; for(const c of SYNC_COLS) store.mem[c]={}; store.mem.meta={};
+    for(const [k,v] of Object.entries(m.docs)){ const i=k.indexOf('/'); const c=k.slice(0,i), id=k.slice(i+1); if(c==='meta') store.mem.meta[id]=v; else if(SYNC_COLS.includes(c)) store.mem[c][id]=v; }
+    for(const c of SYNC_COLS) (store.subs[c]||[]).forEach(cb=>cb({...store.mem[c]})); (store.subs['meta/house']||[]).forEach(cb=>cb(store.mem.meta.house||null)); this.cache(); },
+  cache(){ try{ localStorage.setItem('hh-gh-cache',JSON.stringify({docs:this.docs(),tomb:this.tomb,sha:this.sha,pending:this.pending})); }catch(_){} },
+  async start(){ const c=this.cfg(); this.token=c.token||''; if(c.repo) this.repo=c.repo; this.on=true;
+    try{ const k=JSON.parse(localStorage.getItem('hh-gh-cache')||'null'); if(k){ this.sha=k.sha||null; this.pending=!!k.pending; this.apply({docs:k.docs||{},tomb:k.tomb||{}}); } }catch(_){}
+    if(!this.token){ ghConnectUI(); return; }
+    await this.pull(); if(this.pending) this.dirty();
+    setInterval(()=>{ if(document.visibilityState==='visible'&&!this.pending&&!this.saving) this.pull(); },60000);
+    document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&!this.pending) this.pull(); }); },
+  async pull(){ try{ const f=await this.fetchFile('sync/github.json');
+      if(!f){ const b=await this.fetchFile('backups/latest.json'); const docs={}; if(b){ const d=b.json; for(const c of SYNC_COLS) for(const [id,v] of Object.entries(d[c]||{})) docs[c+'/'+id]={...v,_u:+v._u||1}; if(d.meta) docs['meta/house']={...d.meta,_u:+d.meta._u||1}; }
+        this.sha=null; this.apply(this.merge({docs,tomb:{}})); this.dirty(); return; }
+      this.sha=f.sha; this.apply(this.merge(f.json)); this.lastOk=Date.now(); this.err=''; syncStatus(); }
+    catch(e){ this.err=e.message==='auth'?'GitHub refused the access key. Check it in Setup → Sync.':'Could not reach GitHub. Changes are kept on this device and will sync later.'; syncStatus(); } },
+  dirty(){ this.pending=true; this.cache(); clearTimeout(this.timer); this.timer=setTimeout(()=>this.push(),4000); syncStatus(); },
+  async push(retry=0){ if(!this.token) return; if(this.saving){ clearTimeout(this.timer); this.timer=setTimeout(()=>this.push(),1500); return; } this.saving=true; syncStatus();
+    try{ const body={v:1,app:'house-hub',updated:new Date().toISOString(),docs:this.docs(),tomb:this.tomb};
+      const r=await this.api('sync/github.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Hub edit ('+(isPhone()?'phone':'computer')+')',content:this.b64e(JSON.stringify(body)),branch:'main',...(this.sha?{sha:this.sha}:{})})});
+      if((r.status===409||r.status===422)&&retry<3){ this.saving=false; await this.pull(); return this.push(retry+1); }
+      if(r.status===401||r.status===403) throw new Error('auth'); if(!r.ok) throw new Error('GitHub '+r.status);
+      const j=await r.json(); this.sha=j.content.sha; this.pending=false; this.lastOk=Date.now(); this.err=''; this.cache(); }
+    catch(e){ this.err=e.message==='auth'?'GitHub refused the access key. Check it in Setup → Sync.':'Could not save to GitHub. Your changes are kept on this device; retrying shortly.'; clearTimeout(this.timer); this.timer=setTimeout(()=>this.push(),30000); }
+    finally{ this.saving=false; syncStatus(); } }
+};
+function syncStatus(){ if(!gh.on) return; const el=$('#houseSub'); if(!el) return; const t=gh.err?'⚠ '+gh.err:gh.saving||gh.pending?'Saving to GitHub…':gh.lastOk?'Synced with GitHub':'Connecting to GitHub…'; el.dataset.sync=t; renderTop(); if(UI.view==='setup'&&!isTyping()) renderSetup(); }
+function ghConnectUI(){ if(document.querySelector('#ghConnect')) return; const ov=document.createElement('div'); ov.className='overlay'; ov.id='ghConnect';
+  ov.innerHTML=`<form class="modal" style="width:min(560px,100%)"><h2>Connect this device to your house data</h2>
+   <p style="margin:0;font-size:13.5px">This copy of the hub saves to your private GitHub repo <b class="mono">dudo199/house-hub-data</b>, and stays in sync with the hub in Claude. Paste a GitHub access key once on each device.</p>
+   <ol style="margin:0;padding-left:20px;font-size:13px;line-height:1.55"><li>On GitHub open <b>Settings → Developer settings → Personal access tokens → Fine-grained tokens</b> and press <b>Generate new token</b>.</li>
+   <li>Name it "House hub", set an expiry, and under <b>Repository access</b> choose <b>Only select repositories → house-hub-data</b>.</li>
+   <li>Under <b>Permissions → Repository permissions</b> set <b>Contents</b> to <b>Read and write</b>. Nothing else is needed.</li><li>Generate it, copy it, and paste it here.</li></ol>
+   <label class="f" for="ghTok">Access key<input id="ghTok" type="password" autocomplete="off" placeholder="github_pat_…" required></label>
+   <label class="f" for="ghRepo">Data repository<input id="ghRepo" value="${esc(gh.repo)}"></label>
+   <p class="muted" style="margin:0;font-size:12px">The key is stored only in this browser. It can read and change house-hub-data and nothing else. Remove it any time in Setup → Sync, or revoke it on GitHub.</p>
+   <div class="row-end"><span id="ghMsg" class="muted" style="font-size:12.5px"></span><button class="btn primary" type="submit">Connect</button></div></form>`;
+  document.body.appendChild(ov);
+  ov.querySelector('form').addEventListener('submit',async e=>{ e.preventDefault(); const tok=ov.querySelector('#ghTok').value.trim(), repo=ov.querySelector('#ghRepo').value.trim()||gh.repo; const msg=ov.querySelector('#ghMsg'); msg.textContent='Checking…';
+    gh.token=tok; gh.repo=repo; try{ const r=await gh.api('?ref=main'); if(!r.ok) throw new Error(r.status); gh.setCfg({token:tok,repo}); ov.remove(); toast('Connected. Loading your house…'); await gh.pull(); setInterval(()=>{ if(document.visibilityState==='visible'&&!gh.pending&&!gh.saving) gh.pull(); },60000); }
+    catch(err){ msg.textContent='That key could not open '+repo+'. Check it has Contents: Read and write on that repo.'; } }); }
+function syncSetupHTML(){
+  if(gh.on) return `<section><span class="step">SYNC</span><h2>GitHub sync</h2>
+    <p class="muted" style="margin:0;font-size:12.5px">This copy saves to <b class="mono">${esc(gh.repo)}</b> (file sync/github.json) a few seconds after each change, and checks for changes from your other devices every minute. A scheduled task keeps it in step with the hub in Claude about once an hour; where the same item was changed in both, the newer change wins.</p>
+    <div class="${gh.err?'warn-list':'okline'}" style="padding:0">${esc(gh.err||(gh.pending?'Saving…':gh.lastOk?'Last synced '+new Date(gh.lastOk).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'Not synced yet'))}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small" type="button" id="ghNow">Sync now</button><button class="btn small danger" type="button" id="ghOff">Remove access key from this device</button></div></section>`;
+  return `<section><span class="step">SYNC</span><h2>GitHub copy of the hub</h2>
+    <p class="muted" style="margin:0;font-size:12.5px">A copy of this hub runs at <b class="mono">dudo199.github.io/house-hub</b> and saves to your private house-hub-data repo. A scheduled task syncs the two about once an hour; where the same item was changed in both, the newer change wins. AI features work only here in Claude.</p></section>`;
+}
+
 /* ---------- Routing ---------- */
 const VIEWS=['house','tasks','timeline','plans','electrical','budget','dump','setup'];
 function go(v){ UI.view=v; document.body.dataset.view=v; if(location.hash!=='#'+v) history.replaceState(null,'','#'+v); const a=document.activeElement; a&&a.blur&&a.blur(); deferred=false; $('#main').innerHTML=''; render(); }
@@ -2089,7 +2162,8 @@ window.addEventListener('resize',()=>{ if(UI.view==='house'&&UI.dim==='3d'){ UI.
   store.watch('circuits',o=>{S.circuits=o; scheduleRender();});
   store.watch('furniture',o=>{S.furniture=o; scheduleRender();});
   store.watchDoc('meta/house',m=>{ if(m) S.meta={...S.meta,...m}; scheduleRender(); });
-  window.HUB={S,store,UI};
+  window.HUB={S,store,UI,gh};
+  if(store.ghPending) gh.start();
 })();
 </script>
 </body>
