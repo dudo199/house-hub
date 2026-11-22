@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#f8f9f8">
 <title>House Completion Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,7 +33,7 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-html,body{height:100%;margin:0}
+html,body{height:100%;margin:0;touch-action:pan-x pan-y;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{background:var(--paper);color:var(--ink);font:14px/1.45 var(--body);display:grid;grid-template-rows:auto auto 1fr;overflow:hidden}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -390,6 +390,7 @@ details.checks>:not(summary){margin-bottom:8px}
   .board{grid-template-columns:repeat(4,minmax(240px,1fr))}
 }
 @media (max-width:760px){
+  input,select,textarea,.inp{font-size:16px!important}
   body{display:block;overflow:auto;padding-bottom:calc(70px + env(safe-area-inset-bottom))}
   .top{position:sticky;top:0;z-index:30;padding:calc(8px + env(safe-area-inset-top)) 14px 8px;gap:10px;flex-wrap:nowrap;box-shadow:0 1px 0 var(--line)}
   .brand{min-width:0;flex:1}.brand h1{font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.brand .sub{display:none}
@@ -480,8 +481,15 @@ function fixSvgVars(root){ if(!root||!root.querySelectorAll) return; const els=r
   root.querySelectorAll('[fill*="var("],[stroke*="var("],[stop-color*="var("]').forEach(el=>els.push(el));
   for(const el of els) for(const a of ['fill','stroke','stop-color']){ const v=el.getAttribute(a); if(v&&v.includes('var(')){ el.style.setProperty(a,v); el.removeAttribute(a); } } }
 new MutationObserver(ms=>{ for(const m of ms){ if(m.type==='attributes') fixSvgVars(m.target); else m.addedNodes.forEach(n=>{ if(n.nodeType===1) fixSvgVars(n); }); } }).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['fill','stroke']});
+
+/* Only plan views zoom. Stop the page itself from zooming (iPhone pinch, double-tap, trackpad pinch). */
+const ZOOM_OK='#planSvg,#elecSvg,#setupSvg,#stage,.dbl';
+['gesturestart','gesturechange','gestureend'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
+document.addEventListener('wheel',e=>{ if(e.ctrlKey&&!e.target.closest(ZOOM_OK)) e.preventDefault(); },{passive:false});
+document.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&['+','=','-','0'].includes(e.key)) e.preventDefault(); });
+document.addEventListener('touchmove',e=>{ if(e.touches&&e.touches.length>1&&!e.target.closest(ZOOM_OK)) e.preventDefault(); },{passive:false});
 /* ---------- Constants ---------- */
-const APP_VERSION='2026-11-22.5';
+const APP_VERSION='2026-11-22.6';
 const SECTORS=[
   {key:'walls',label:'Plastering & wall works',color:'#a47a45'},
   {key:'electrical',label:'Electrical',color:'#d29500'},
@@ -790,8 +798,12 @@ function applyCam(){ const w=$('#world'); if(!w) return; const n=UI.level==='all
   w.style.transform=`scale(${UI.zoom}) rotateX(${UI.tilt}deg) rotateZ(${UI.spin}deg) translateZ(${-zc}px)`; }
 function bindStage(){
   const st=$('#stage'); let drag=null; UI._dragged=false;
+  const tp=new Map(); let pz=null;
+  st.addEventListener('pointerdown',e=>{ tp.set(e.pointerId,{x:e.clientX,y:e.clientY}); if(tp.size===2){ const a=[...tp.values()]; pz={d:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),z:UI.zoom}; drag=null; UI._dragged=true; } },true);
+  st.addEventListener('pointermove',e=>{ if(!tp.has(e.pointerId)) return; tp.set(e.pointerId,{x:e.clientX,y:e.clientY}); if(pz&&tp.size===2){ const a=[...tp.values()]; const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y); if(UI.dim!=='2d'&&pz.d>0){ UI.zoom=Math.max(.3,Math.min(3,pz.z*d/pz.d)); applyCam(); } } },true);
+  const endp=e=>{ tp.delete(e.pointerId); if(tp.size<2) pz=null; }; st.addEventListener('pointerup',endp,true); st.addEventListener('pointercancel',endp,true);
   st.addEventListener('pointerdown',e=>{ if(UI.dim==='2d'||e.target.closest('.zoom,.legend')) return; drag={x:e.clientX,y:e.clientY,spin:UI.spin,tilt:UI.tilt}; UI._dragged=false; });
-  window.addEventListener('pointermove',e=>{ if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if(Math.abs(dx)+Math.abs(dy)>4){UI._dragged=true; st.classList.add('drag');}
+  window.addEventListener('pointermove',e=>{ if(!drag||pz) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if(Math.abs(dx)+Math.abs(dy)>4){UI._dragged=true; st.classList.add('drag');}
     UI.spin=drag.spin+dx*.4; UI.tilt=Math.max(8,Math.min(84,drag.tilt-dy*.3)); applyCam(); });
   window.addEventListener('pointerup',()=>{ drag=null; st.classList.remove('drag'); });
   st.addEventListener('wheel',e=>{ if(UI.dim==='2d') return; e.preventDefault(); UI.zoom=Math.max(.3,Math.min(3,UI.zoom*Math.exp(-e.deltaY*.0012))); applyCam(); },{passive:false});
