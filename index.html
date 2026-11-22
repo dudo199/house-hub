@@ -256,9 +256,12 @@ textarea{resize:vertical}
 .okline{font-size:12.5px;color:var(--good)}
 .csv{font:12px/1.4 var(--mono);width:100%;min-height:110px;border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:8px}
 
+/* Update bar */
+#updBar{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:60;display:flex;gap:10px;align-items:center;background:var(--ink);color:var(--panel);padding:8px 8px 8px 14px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:13px;max-width:calc(100vw - 24px)}
 /* Deliberate editing */
 #bubble{position:fixed;left:50%;bottom:18px;transform:translate(-50%,140%);display:flex;align-items:center;gap:10px;max-width:min(540px,calc(100vw - 24px));background:var(--ink);color:var(--panel);border-radius:999px;padding:7px 7px 7px 14px;box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:48;font-size:13px;cursor:pointer;transition:transform .18s ease;opacity:.98}
 #bubble.show{transform:translate(-50%,0)}
+#bubble{touch-action:none;user-select:none;-webkit-user-select:none}
 #bubble .bd{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 0 2px rgba(255,255,255,.35)}
 #bubble .bt{display:flex;flex-direction:column;min-width:0;line-height:1.2}
 #bubble .bt b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
@@ -478,6 +481,7 @@ function fixSvgVars(root){ if(!root||!root.querySelectorAll) return; const els=r
   for(const el of els) for(const a of ['fill','stroke','stop-color']){ const v=el.getAttribute(a); if(v&&v.includes('var(')){ el.style.setProperty(a,v); el.removeAttribute(a); } } }
 new MutationObserver(ms=>{ for(const m of ms){ if(m.type==='attributes') fixSvgVars(m.target); else m.addedNodes.forEach(n=>{ if(n.nodeType===1) fixSvgVars(n); }); } }).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['fill','stroke']});
 /* ---------- Constants ---------- */
+const APP_VERSION='2026-11-22.5';
 const SECTORS=[
   {key:'walls',label:'Plastering & wall works',color:'#a47a45'},
   {key:'electrical',label:'Electrical',color:'#d29500'},
@@ -1123,11 +1127,19 @@ Give exactly three numbered next actions, one line each, most useful first, in t
 
 /* ---------- Deliberate selection: tap once to select (small bubble), tap again or tap the bubble to open/edit ---------- */
 const bubble={el:null,on:null,
-  show({dot,title,meta,action='Open',onOpen}){ if(!this.el){ this.el=document.createElement('div'); this.el.id='bubble'; this.el.setAttribute('role','status'); document.body.appendChild(this.el);
-      this.el.addEventListener('click',e=>{ if(e.target.closest('.bx')){ disarm(); return; } const f=this.on; if(f){ this.hide(); f(); } }); }
+  show({dot,title,meta,action='Open',onOpen,sticky}){ if(!this.el){ this.el=document.createElement('div'); this.el.id='bubble'; this.el.setAttribute('role','status'); document.body.appendChild(this.el);
+      this.el.addEventListener('click',e=>{ if(this.swiped){ this.swiped=false; return; } if(e.target.closest('.bx')){ dismissBubble(); return; } const f=this.on; if(f){ this.hide(); f(); } });
+      let sw=null; const el=this.el;
+      el.addEventListener('pointerdown',e=>{ sw={x:e.clientX,y:e.clientY,dx:0,dy:0,id:e.pointerId}; el.style.transition='none'; });
+      el.addEventListener('pointermove',e=>{ if(!sw||e.pointerId!==sw.id) return; sw.dx=e.clientX-sw.x; sw.dy=Math.max(0,e.clientY-sw.y); if(Math.abs(sw.dx)+sw.dy>6){ try{el.setPointerCapture(sw.id);}catch(_){} } el.style.transform=`translate(calc(-50% + ${sw.dx}px), ${sw.dy}px)`; el.style.opacity=String(Math.max(.2,1-(Math.abs(sw.dx)+sw.dy)/220)); });
+      const end=()=>{ if(!sw) return; const {dx,dy}=sw; sw=null; el.style.transition=''; if(Math.abs(dx)>70||dy>36){ this.swiped=true; el.style.transform=`translate(calc(-50% + ${dx>0?120:dx<0?-120:0}vw), ${dy>36?150:0}%)`; el.style.opacity='0'; setTimeout(()=>{ el.style.transform=''; el.style.opacity=''; dismissBubble(); },180); } else { if(Math.abs(dx)+dy>6) this.swiped=true; el.style.transform=''; el.style.opacity=''; setTimeout(()=>{ this.swiped=false; },0); } };
+      el.addEventListener('pointerup',end); el.addEventListener('pointercancel',end); }
+    clearTimeout(this.t); if(!sticky) this.t=setTimeout(()=>{ if(this.el.classList.contains('show')&&UI.armed!=='plansel') disarm(); },12000);
     this.on=onOpen; this.el.innerHTML=`${dot?`<span class="bd" style="background:${dot}"></span>`:''}<span class="bt"><b>${esc(title||'')}</b>${meta?`<span>${esc(meta)}</span>`:''}</span><span class="ba">${esc(action)} ›</span><button type="button" class="bx" aria-label="Close">×</button>`; this.el.classList.add('show'); },
-  hide(){ if(this.el) this.el.classList.remove('show'); this.on=null; }
+  hide(){ if(this.el){ this.el.classList.remove('show'); this.el.style.transform=''; this.el.style.opacity=''; } this.on=null; clearTimeout(this.t); }
 };
+function dismissBubble(){ if(UI.armed==='plansel'){ UI.planSel=null; UI.furnSel=null; UI.selExpanded=false; disarm(); if(UI.view==='plans') renderPlans(); return; } disarm(); }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'&&UI.armed&&UI.armed!=='plansel') disarm(); });
 function disarm(){ UI.armed=null; bubble.hide(); document.querySelectorAll('.armed').forEach(e=>e.classList.remove('armed')); }
 function twoTap(key,el,info,open){
   if(UI.armed===key){ disarm(); open(); return; }
@@ -1148,7 +1160,7 @@ function circInfo(id){ const c={id,...S.circuits[id]}; const n=elecPts().filter(
 function itemInfo(id){ const i=S.items[id]||{}; return {title:i.name,meta:[CAT[i.category]?.label,eur(lineTotal(i)),IST[i.status||'idea']?.label].filter(Boolean).join(' · '),action:'Open'}; }
 function selInfo(){ if(UI.furnSel&&S.furniture[UI.furnSel]){ const f=S.furniture[UI.furnSel]; return {dot:fFill(f),title:f.label||FK[f.kind]?.l||'Item',meta:`${f.w} × ${f.d} × ${f.h} mm · ${roomName(f.roomId)}`,action:'Edit'}; }
   if(UI.planSel&&S.points[UI.planSel]){ const q=S.points[UI.planSel]; const cc=q.circuitId&&S.circuits[q.circuitId]; return {dot:cc?circColor(cc):SEC[PT[q.type]?.sector]?.color,title:ptLabel(q),meta:[roomName(q.roomId),q.height!==''&&q.height!=null?heightLabel(q):'',cc?cref(cc):'',q.done?'done':''].filter(Boolean).join(' · '),action:'Edit'}; } return null; }
-function syncPlanBubble(){ if(UI.view!=='plans') return; const i=selInfo(); if(i&&!UI.selExpanded){ UI.armed='plansel'; bubble.show({...i,onOpen:()=>{ UI.selExpanded=true; UI.armed=null; bubble.hide(); renderPlans(); }}); } else if(UI.armed==='plansel'||!i){ if(UI.armed==='plansel') UI.armed=null; bubble.hide(); } }
+function syncPlanBubble(){ if(UI.view!=='plans') return; const i=selInfo(); if(i&&!UI.selExpanded){ UI.armed='plansel'; bubble.show({...i,sticky:true,onOpen:()=>{ UI.selExpanded=true; UI.armed=null; bubble.hide(); renderPlans(); }}); } else if(UI.armed==='plansel'||!i){ if(UI.armed==='plansel') UI.armed=null; bubble.hide(); } }
 /* ---------- Events ---------- */
 document.addEventListener('click',e=>{
   const t=e.target;
@@ -2317,14 +2329,21 @@ function syncSetupHTML(){
   if(gh.on) return `<section><span class="step">SYNC</span><h2>GitHub sync</h2>
     <p class="muted" style="margin:0;font-size:12.5px">This copy saves to <b class="mono">${esc(gh.repo)}</b> (file sync/github.json) a few seconds after each change, and checks for changes from your other devices every minute. A scheduled task keeps it in step with the hub in Claude about once an hour; where the same item was changed in both, the newer change wins.</p>
     <div class="${gh.err?'warn-list':'okline'}" style="padding:0">${esc(gh.err||(gh.pending?'Saving…':gh.lastOk?'Last synced '+new Date(gh.lastOk).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'Not synced yet'))}</div>
+    <div class="muted" style="font-size:11.5px">App version ${APP_VERSION}</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small" type="button" id="ghNow">Sync now</button><button class="btn small danger" type="button" id="ghOff">Remove access key from this device</button></div></section>`;
   return `<section><span class="step">SYNC</span><h2>GitHub copy of the hub</h2>
     <p class="muted" style="margin:0;font-size:12.5px">A copy of this hub runs at <b class="mono">dudo199.github.io/house-hub</b> and saves to your private house-hub-data repo. A scheduled task syncs the two about once an hour; where the same item was changed in both, the newer change wins. AI features work only here in Claude.</p></section>`;
 }
 
+
+/* ---------- Update check for the GitHub Pages copy (phones keep old copies of web pages) ---------- */
+async function checkForUpdate(){ if(window.claude||!/^https?:/.test(location.protocol)) return; try{ const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return; const {v}=await r.json(); if(v&&v!==APP_VERSION) showUpdate(v); }catch(_){} }
+function showUpdate(v){ if($('#updBar')) return; const b=document.createElement('div'); b.id='updBar'; b.innerHTML=`<span>A newer version of the hub is ready.</span><button class="btn small primary" type="button">Update now</button>`; b.querySelector('button').addEventListener('click',()=>{ location.replace(location.pathname+'?v='+encodeURIComponent(v)+location.hash); }); document.body.appendChild(b); }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') checkForUpdate(); });
+setTimeout(checkForUpdate,3000);
 /* ---------- Routing ---------- */
 const VIEWS=['house','tasks','timeline','plans','electrical','budget','dump','setup'];
-function go(v){ disarm(); if(v!=='plans'){ UI.selExpanded=false; } UI.view=v; document.body.dataset.view=v; if(location.hash!=='#'+v) history.replaceState(null,'','#'+v); const a=document.activeElement; a&&a.blur&&a.blur(); deferred=false; $('#main').innerHTML=''; render(); }
+function go(v){ disarm(); if(v!=='plans'){ UI.selExpanded=false; UI.planSel=null; UI.furnSel=null; } UI.view=v; document.body.dataset.view=v; if(location.hash!=='#'+v) history.replaceState(null,'','#'+v); const a=document.activeElement; a&&a.blur&&a.blur(); deferred=false; $('#main').innerHTML=''; render(); }
 window.addEventListener('hashchange',()=>{ const h=location.hash.slice(1); if(VIEWS.includes(h)&&h!==UI.view) go(h); });
 window.addEventListener('resize',()=>{ if(UI.view==='house'&&UI.dim==='3d'){ UI.zoom=null; build3D(); } });
 
