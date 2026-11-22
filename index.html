@@ -262,7 +262,7 @@ textarea{resize:vertical}
 .card h2{font-size:16px}
 .egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
 .sld{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
-.checks{position:sticky;top:0;max-height:calc(100vh - 150px);overflow:auto}
+.checks{}
 .std{font-size:12px;color:var(--muted);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 10px;line-height:1.5}
 .chk{border-left:4px solid var(--c);padding:6px 10px;font-size:12.5px;background:var(--paper);border-radius:0 6px 6px 0;display:flex;flex-direction:column;gap:3px}
 .chk.error{--c:var(--bad)} .chk.warn{--c:var(--warn)} .chk.info{--c:var(--accent)}
@@ -273,6 +273,35 @@ textarea{resize:vertical}
 .un-row{display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0}
 .btbl tr[data-circ]{cursor:pointer}
 .btbl tr[data-circ]:hover td{background:var(--paper)}
+/* Collapsible sections */
+details.fold{padding:0;gap:0}
+details.fold>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 14px;cursor:pointer;border-radius:10px}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary h2{display:flex;align-items:center;gap:8px}
+details.fold>summary h2::before{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;flex:none;margin-right:2px}
+details.fold[open]>summary h2::before{transform:rotate(45deg)}
+details.fold>summary:hover{background:var(--paper)}
+details.fold[open]>summary{border-bottom:1px solid var(--line);border-radius:10px 10px 0 0}
+details.fold>:not(summary){margin:0 14px}
+details.fold>:not(summary):first-of-type{margin-top:12px}
+details.fold>:last-child{margin-bottom:14px}
+details.fold:not([open]){background:var(--panel)}
+.fold-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.checks-wrap{position:sticky;top:0;align-self:start}
+.checks-wrap details.fold{max-height:calc(100vh - 150px);overflow:auto}
+details.checks>:not(summary){margin-bottom:8px}
+/* Electrical plan */
+.eplan-grid{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:14px;align-items:start;margin-bottom:14px!important}
+.eplan-svg{background:var(--paper);border:1px solid var(--line);border-radius:8px;height:min(62vh,640px)}
+.eplan-svg svg{width:100%;height:100%;display:block}
+.eplan-side{display:flex;flex-direction:column;gap:8px}
+.circ-chips{display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow:auto}
+.cchip{display:grid;grid-template-columns:12px auto 1fr auto;gap:6px;align-items:center;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:5px 8px;font-size:12.5px;text-align:left}
+.cchip i{width:12px;height:12px;border-radius:3px}
+.cchip span:nth-of-type(1){font:600 11.5px var(--mono)}
+.cchip .muted{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cchip.off{opacity:.4}
+.cchip.off i{background:transparent!important;border:1px solid var(--muted)}
 /* DB layout */
 .dbl{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:10px}
 .dbl svg{display:block;touch-action:none}
@@ -376,6 +405,8 @@ textarea{resize:vertical}
   .sel-card{position:fixed;left:8px;right:8px;bottom:calc(72px + env(safe-area-inset-bottom));max-height:46vh;overflow:auto;z-index:45;background:var(--panel);box-shadow:0 -8px 30px rgba(0,0,0,.28);border-radius:14px!important}
   .egrid{grid-template-columns:1fr 1fr}
   .elec-grid{gap:12px}
+  .eplan-grid{grid-template-columns:1fr}.eplan-svg{height:52vh}.circ-chips{max-height:none;flex-direction:row;flex-wrap:wrap}.cchip{grid-template-columns:12px auto auto}.cchip .muted{display:none}
+  .checks-wrap{position:static}.checks-wrap details.fold{max-height:none}
   .card{padding:12px}
   .btbl th:nth-child(3),.btbl td:nth-child(3),.btbl th:nth-child(4),.btbl td:nth-child(4){display:none}
   #main .btbl tr[data-circ] td:nth-child(5),#main .btbl tr[data-circ] td:nth-child(6),#main .btbl tr[data-circ] td:nth-child(8){display:none}
@@ -1857,6 +1888,23 @@ function sldSVG(b){
 }
 
 /* ----- Electrical view ----- */
+
+function foldOpen(k,def){ const v=(UI.folds||{})[k]; return (v==null?def:v)?'open':''; }
+try{ UI.folds=JSON.parse(localStorage.getItem('hh-folds')||'{}'); }catch(_){ UI.folds={}; }
+document.addEventListener('toggle',e=>{ const d=e.target; if(!(d instanceof HTMLDetailsElement)||!d.dataset.fold) return; UI.folds[d.dataset.fold]=d.open; try{ localStorage.setItem('hh-folds',JSON.stringify(UI.folds)); }catch(_){} if(d.open&&d.dataset.fold==='eplan') fitElecPlan(); },true);
+document.addEventListener('click',e=>{ if(e.target.closest('summary')&&e.target.closest('button,select,input,label,a,.seg')) e.preventDefault(); },true);
+function elecPlanHTML(){
+  const lv=UI.elecLevel??0; const b=houseBounds(); const pad=1.2; const vb=[b.x0-pad,b.y0-pad,(b.x1-b.x0)+pad*2,(b.y1-b.y0)+pad*2];
+  const cs=circuitList().filter(c=>c.kind!=='submain'); const pts=elecPts().filter(p=>S.rooms[p.roomId]?.level===lv);
+  const svg=planG(lv,{fill:'plain',pts:['electrical','lighting'],filterCirc:true,byCirc:true,heights:false,furn:false,labels:true,ptScale:isPhone()?1.3:1.6});
+  return `<details class="card fold eplan" data-fold="eplan" ${foldOpen('eplan',true)}><summary><h2>Electrical plan</h2><span class="fold-meta"><span class="seg">${LEVELS.map((l,i)=>`<button type="button" data-elv="${i}" aria-pressed="${lv===i}">${l.split(' ')[0]}</button>`).join('')}</span></span></summary>
+   <div class="eplan-grid"><div class="eplan-svg"><svg id="elecSvg" viewBox="${vb.join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Electrical plan, ${LEVELS[lv]}">${svg}</svg></div>
+   <div class="eplan-side"><div class="muted" style="font-size:12px">${pts.length} point${pts.length===1?'':'s'} on this level · tap a circuit to show only it</div>
+    <div class="circ-chips">${cs.map(c=>{ const n=pts.filter(p=>p.circuitId===c.id).length; const off=!!UI.hiddenCircs[c.id]; return `<button type="button" class="cchip${off?' off':''}" data-cchip="${c.id}" title="${esc(cref(c))} ${esc(c.name||'')}"><i style="background:${circColor(c)}"></i><span>${esc(cref(c))}</span><span class="muted">${esc(c.name||'')}</span><b class="num">${n}</b></button>`; }).join('')}
+    ${pts.some(p=>!(p.circuitId&&S.circuits[p.circuitId]))?`<button type="button" class="cchip${UI.hiddenCircs.none?' off':''}" data-cchip="none"><i style="border:1px dashed var(--muted)"></i><span>Not on a circuit</span><b class="num">${pts.filter(p=>!(p.circuitId&&S.circuits[p.circuitId])).length}</b></button>`:''}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn small" type="button" data-cchip="all">Show all</button><button class="btn small" type="button" data-goplan="${lv}">Edit points on Plans</button></div></div></div></details>`;
+}
+function fitElecPlan(){}
 function renderElectrical(){
   const bs=boardList(); if(UI.board&&!S.boards[UI.board]) UI.board=null; if(!UI.board&&bs.length) UI.board=bs[0].id;
   const b=UI.board?{id:UI.board,...S.boards[UI.board]}:null; const chk=elecChecks();
@@ -1870,8 +1918,9 @@ function renderElectrical(){
    <div class="toolbar"><div class="seg" role="tablist" aria-label="Distribution boards">${bs.map(x=>`<button type="button" data-board="${x.id}" aria-pressed="${x.id===UI.board}">${esc(x.name)}${x.role==='main'?' · main':' · sub'}</button>`).join('')}</div>
      <button class="btn" type="button" id="addBoard">+ Add board</button>
      <span style="margin-left:auto;display:flex;gap:8px;align-items:center"><span class="pill" style="background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)">${cnt('error')} must fix</span><span class="pill waiting">${cnt('warn')} to check</span><span class="pill doing">${cnt('info')} notes</span></span></div>
+   ${elecPlanHTML()}
    ${b?`<div class="elec-grid"><div style="display:flex;flex-direction:column;gap:14px;min-width:0">
-     <section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>${esc(b.name)} details</h2><span style="display:flex;gap:6px"><button class="btn small" type="button" id="placeBoard">${b.x!=null?'Move on plan':'Place on plan'}</button><button class="btn small danger" type="button" id="delBoard">${UI.confirmDel===b.id?'Click again to delete':'Delete board'}</button></span></div>
+     <details class="card fold" data-fold="details" ${foldOpen("details",false)}><summary><h2>${esc(b.name)} details</h2><span style="display:flex;gap:6px"><button class="btn small" type="button" id="placeBoard">${b.x!=null?'Move on plan':'Place on plan'}</button><button class="btn small danger" type="button" id="delBoard">${UI.confirmDel===b.id?'Click again to delete':'Delete board'}</button></span></summary>
        <div class="egrid">
         <label class="f" for="bdName">Name<input id="bdName" value="${esc(b.name)}"></label>
         <label class="f" for="bdRole">Role${sel('bdRole',[['main','Main board (origin)'],['sub','Sub-board']],b.role)}</label>
@@ -1885,27 +1934,27 @@ function renderElectrical(){
         <label class="f" for="bdSupply">Supply / cut-out rating (A)<input id="bdSupply" type="number" min="0" value="${esc(b.supplyA??'')}"></label>`:''}
         <label class="f" for="bdSpd">Surge protection (SPD)${sel('bdSpd',yn,b.spd)}</label>
         <label class="f" for="bdEnc">Enclosure${sel('bdEnc',[['','Not recorded'],['metal','Metal (non-combustible)'],['plastic','Plastic']],b.enclosure)}</label>
-       </div></section>
-     ${(()=>{ const D=dbLayoutSVG(b); return `<section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>Board layout</h2><span class="muted num" style="font-size:12.5px"><b style="color:${D.L.free<0||D.L.overflow.length?'var(--bad)':'var(--ink)'}">${D.L.used}</b> of ${D.L.total} modules used · ${D.L.free} free</span></div>
+       </div></details>
+     ${(()=>{ const D=dbLayoutSVG(b); return `<details class="card fold" data-fold="layout" ${foldOpen("layout",true)}><summary><h2>Board layout</h2><span class="muted num" style="font-size:12.5px"><b style="color:${D.L.free<0||D.L.overflow.length?'var(--bad)':'var(--ink)'}">${D.L.used}</b> of ${D.L.total} modules used · ${D.L.free} free</span></summary>
        <div class="devbar"><button class="btn small" type="button" id="addDev">+ Add device</button><button class="btn small" type="button" data-adddev="rcd">+ Main RCD</button><button class="btn small" type="button" data-adddev="spd">+ SPD</button><button class="btn small" type="button" data-adddev="ovr">+ OVR</button><button class="btn small" type="button" data-adddev="wifi">+ Wi-Fi breaker</button><span style="flex:1"></span><button class="btn small" type="button" id="renumWays">Renumber ways left to right</button><button class="btn small" type="button" data-undo>↶ Undo</button></div>
        <div class="dbl">${D.svg}</div>
        ${D.L.overflow.length?`<div class="warn-list" style="color:var(--bad);padding:0">No room for: ${D.L.overflow.map(i=>esc(i.circ?cref(i.circ):DEVK[i.dev.kind]?.short)).join(', ')}. Add a row or more modules per row.</div>`:''}
-       <p class="muted" style="font-size:12px;margin:0">Drag a device to move it; drop it on a device of the same width to swap. Click to edit. The small number on each device is how many modules it takes.</p></section>`; })()}
-     <section class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>Wiring diagram</h2><span class="muted" style="font-size:12px">Click a circuit to edit it. Red outline = must-fix issue.</span></div><div class="sld">${sldSVG(b)}</div></section>
-     <section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>Circuit schedule</h2><span style="display:flex;gap:6px">${cs.length?'':'<button class="btn small" type="button" id="tplCirc">Add typical home circuits</button>'}<button class="btn small primary" type="button" id="addCirc">+ Add circuit</button></span></div>
+       <p class="muted" style="font-size:12px;margin:0">Drag a device to move it; drop it on a device of the same width to swap. Click to edit. The small number on each device is how many modules it takes.</p></details>`; })()}
+     <details class="card fold" data-fold="sld" ${foldOpen("sld",false)}><summary><h2>Wiring diagram</h2><span class="muted" style="font-size:12px">Click a circuit to edit it. Red outline = must-fix issue.</span></summary><div class="sld">${sldSVG(b)}</div></details>
+     <details class="card fold" data-fold="sched" ${foldOpen("sched",true)}><summary><h2>Circuit schedule</h2><span style="display:flex;gap:6px">${cs.length?'':'<button class="btn small" type="button" id="tplCirc">Add typical home circuits</button>'}<button class="btn small primary" type="button" id="addCirc">+ Add circuit</button></span></summary>
        ${cs.length?`<div class="tbl-wrap"><table class="btbl"><thead><tr><th>Way</th><th>Circuit</th><th>Protection</th><th>RCD</th><th>Cable</th><th class="r">Length</th><th class="r">Points</th><th class="r">V drop</th><th>Checks</th></tr></thead><tbody>
        ${cs.map(c=>{ const n=elecPts().filter(p=>p.circuitId===c.id).length; const vd=circuitVd(c); const ck=chk.filter(k=>k.cid===c.id); const e=ck.filter(k=>k.level==='error').length, w=ck.filter(k=>k.level==='warn').length;
          return `<tr data-circ="${c.id}"><td class="mono" style="white-space:nowrap"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${circColor(c)};margin-right:5px;vertical-align:-1px"></i>${esc(c.way||'')}</td><td><b style="font-weight:500">${esc(c.name||KIND[c.kind]?.label)}</b><div class="muted" style="font-size:12px">${esc(KIND[c.kind]?.label||'')}${c.kind==='submain'?' → '+esc(S.boards[c.feeds]?.name||'?'):''}</div></td>
          <td class="mono" style="white-space:nowrap">${esc(c.device||'')} ${esc(c.curve||'')}${esc(c.rating||'')}${c.kA?` · ${c.kA}kA`:''}</td><td class="mono" style="white-space:nowrap">${c.device==='MCB'||c.device==='WIFI'?'—':`${c.rcdMa||30}mA ${c.rcdType||''}`}${c.afdd?' +AFDD':''}</td>
          <td class="mono" style="white-space:nowrap">${esc(c.cable||'?')}/${esc(c.cpc||'?')} mm²<div class="muted" style="font-size:11px">${esc(METHODS[c.method]?.short||'')}</div></td><td class="r">${c.length?c.length+' m':'—'}</td><td class="r">${c.kind==='submain'?'—':n}</td><td class="r">${vd!=null?(vd/2.3).toFixed(1)+'%':'—'}</td>
          <td>${e?`<span class="pill" style="background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)">${e} fix</span> `:''}${w?`<span class="pill waiting">${w} check</span>`:''}${!e&&!w?'<span class="pill done">OK</span>':''}</td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">No circuits on this board yet.</div>'}
-       <p class="muted" style="font-size:12px;margin:0">Cable ratings use BS 7671 Appendix 4 for 70 °C PVC copper at 30 °C; voltage drop is estimated at the full breaker rating (conservative), including the sub-main for sub-boards.</p></section>
-     ${un.length?`<section class="card"><h2>Points still to connect (${un.length})</h2><p class="muted" style="font-size:12px;margin:0">Sockets and switches go on a circuit; light points go on a switch and take the switch's circuit.</p><div class="un-list">${un.map(p=>{const ty=PT[p.type];return `<div class="un-row"><span class="glyph" style="--c:${SEC[ty.sector].color}">${esc(ptGlyph(p))}</span><span style="flex:1">${esc(p.label||ptLabel(p))} <span class="muted">· ${esc(roomName(p.roomId))}${p.height!=null&&p.height!==''?' · '+esc(heightLabel(p)):''}</span></span>${p.type==='light'?`<select class="inp" data-assignsw="${p.id}" aria-label="Assign switch"><option value="">Switched by…</option>${pointList().filter(w=>w.type==='switch').map(w=>`<option value="${w.id}">${esc(swName(w))}</option>`).join('')}</select>`:`<select class="inp" data-assign="${p.id}" aria-label="Assign circuit"><option value="">Assign to…</option>${circuitList().filter(c=>c.kind!=='submain').map(c=>`<option value="${c.id}">${esc(cref(c))} ${esc(c.name||'')}</option>`).join('')}</select>`}</div>`}).join('')}</div></section>`:''}
+       <p class="muted" style="font-size:12px;margin:0">Cable ratings use BS 7671 Appendix 4 for 70 °C PVC copper at 30 °C; voltage drop is estimated at the full breaker rating (conservative), including the sub-main for sub-boards.</p></details>
+     ${un.length?`<details class="card fold" data-fold="unconn" ${foldOpen("unconn",true)}><summary><h2>Points still to connect (${un.length})</h2></summary><p class="muted" style="font-size:12px;margin:0">Sockets and switches go on a circuit; light points go on a switch and take the switch's circuit.</p><div class="un-list">${un.map(p=>{const ty=PT[p.type];return `<div class="un-row"><span class="glyph" style="--c:${SEC[ty.sector].color}">${esc(ptGlyph(p))}</span><span style="flex:1">${esc(p.label||ptLabel(p))} <span class="muted">· ${esc(roomName(p.roomId))}${p.height!=null&&p.height!==''?' · '+esc(heightLabel(p)):''}</span></span>${p.type==='light'?`<select class="inp" data-assignsw="${p.id}" aria-label="Assign switch"><option value="">Switched by…</option>${pointList().filter(w=>w.type==='switch').map(w=>`<option value="${w.id}">${esc(swName(w))}</option>`).join('')}</select>`:`<select class="inp" data-assign="${p.id}" aria-label="Assign circuit"><option value="">Assign to…</option>${circuitList().filter(c=>c.kind!=='submain').map(c=>`<option value="${c.id}">${esc(cref(c))} ${esc(c.name||'')}</option>`).join('')}</select>`}</div>`}).join('')}</div></details>`:''}
    </div>
-   <aside class="card checks"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2>Checks & notes</h2><div class="seg"><button type="button" data-chkf="board" aria-pressed="${filt==='board'}">This board</button><button type="button" data-chkf="all" aria-pressed="${filt==='all'}">All</button></div></div>
+   <aside class="checks-wrap"><details class="card fold checks" data-fold="checks" ${foldOpen("checks",!isPhone())}><summary><h2>Checks & notes</h2><div class="seg"><button type="button" data-chkf="board" aria-pressed="${filt==='board'}">This board</button><button type="button" data-chkf="all" aria-pressed="${filt==='all'}">All</button></div></summary>
      <div class="std">Checked against <b>BS 7671 (IET Wiring Regulations, 18th Edition)</b> and Malta's <b>Electrical Installations Regulations</b>. Malta calls up the 18th Edition; the UK's current text is BS 7671:2018+A4:2026, so items only in the newer UK text are marked UK. <span class="tag mt">MT</span> = Malta requirement · <span class="tag uk">UK</span> = BS 7671.<br><b>This is a planning aid, not a design.</b> The installation must be designed, tested and certified by an electrician or engineer with the right Malta authorisation.</div>
      ${shown.map(k=>`<div class="chk ${k.level}"${k.cid?` data-circ="${k.cid}" style="cursor:pointer"`:''}><div class="chk-h"><span style="color:${SEV[k.level].c};font-weight:700">${SEV[k.level].label}</span>${k.src?`<span class="tag ${k.src==='MT'?'mt':'uk'}">${k.src}</span>`:''}${k.ref?`<span class="muted mono" style="font-size:10.5px">${esc(k.ref)}</span>`:''}</div><div>${esc(k.text)}</div></div>`).join('')||'<div class="empty">Nothing to flag on this board.</div>'}
-   </aside></div>`:`<div class="empty" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px">No boards yet. Add your main distribution board and the sub-board, then their circuits.</div>`}
+   </details></aside></div>`:`<div class="empty" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px">No boards yet. Add your main distribution board and the sub-board, then their circuits.</div>`}
   </div>`;
   afterElecRender();
 }
@@ -1963,6 +2012,9 @@ function addTypicalCircuits(bid){
   toast('Added 7 typical circuits. Edit them to match your board.');
 }
 function handleElecClick(t){
+  const ev=t.closest('[data-elv]'); if(ev){ UI.elecLevel=Number(ev.dataset.elv); renderElectrical(); return true; }
+  const cc=t.closest('[data-cchip]'); if(cc){ const id=cc.dataset.cchip; if(id==='all') UI.hiddenCircs={}; else { const others=[...Object.keys(S.circuits),'none'].filter(k=>k!==id); const onlyThis=others.every(k=>UI.hiddenCircs[k])&&!UI.hiddenCircs[id]; UI.hiddenCircs={}; if(!onlyThis) others.forEach(k=>UI.hiddenCircs[k]=true); } renderElectrical(); return true; }
+  const ep=t.closest('#elecSvg [data-pt]'); if(ep){ const pt=S.points[ep.dataset.pt]; if(pt){ UI.planLevel=S.rooms[pt.roomId]?.level??0; UI.planSel=ep.dataset.pt; UI.tool='select'; go('plans'); } return true; }
   const bd=t.closest('[data-board]'); if(bd){ UI.board=bd.dataset.board; UI.confirmDel=null; renderElectrical(); return true; }
   if(t.closest('#addBoard')){ const n=boardList().length; const id=uid('b'); UI.board=id; store.put('boards',id,{name:'DB'+(n+1),role:n?'sub':'main',roomId:'',rows:1,perRow:12,mainSwitch:'',poles:'',ovuv:'',spd:'',enclosure:'',ra:'',supplyA:''}); return true; }
   if(t.closest('#delBoard')){ const id=UI.board; if(UI.confirmDel===id){ circuitList().filter(c=>c.boardId===id).forEach(c=>{ store.del('circuits',c.id); pointList().filter(p=>p.circuitId===c.id).forEach(p=>{const n=clone(S.points[p.id]); n.circuitId=''; savePoint(p.id,n);}); }); store.del('boards',id); UI.board=null; UI.confirmDel=null; } else { UI.confirmDel=id; renderElectrical(); } return true; }
